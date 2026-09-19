@@ -8,6 +8,10 @@ import hostelRoutes from "./routes/hostelRoutes.js";
 import laundryGroupRoutes from "./routes/laundryGroupRoutes.js";
 import scheduleRoutes from "./routes/scheduleRoutes.js";
 import laundryRoutes from "./routes/laundryRoutes.js";
+import complaintRoutes from "./routes/complaintRoutes.js";
+import lostFoundRoutes from "./routes/lostFoundRoutes.js";
+import feedbackRoutes from "./routes/feedbackRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 import { errorMiddleware } from "./middleware/errorMiddleware.js";
 
 const app = express();
@@ -43,6 +47,10 @@ app.use("/api/v1/hostels", hostelRoutes);
 app.use("/api/v1/laundry-groups", laundryGroupRoutes);
 app.use("/api/v1/schedules", scheduleRoutes);
 app.use("/api/v1/laundry", laundryRoutes);
+app.use("/api/v1/complaints", complaintRoutes);
+app.use("/api/v1/lost-found", lostFoundRoutes);
+app.use("/api/v1/feedback", feedbackRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
 
 // Catch 404 for undefined routes
 app.use((req, res) => {
