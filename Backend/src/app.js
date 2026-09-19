@@ -1,39 +1,48 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import dotenv from "dotenv";
+import { env } from "./config/env.js";
 import authRoutes from "./routes/authRoutes.js";
-
-dotenv.config();
+import { errorMiddleware } from "./middleware/errorMiddleware.js";
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
 // Middlewares
-app.use(cors({
-  origin: true, // Allow all origins in dev, can restrict later
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: true, // Allow all in dev, can restrict in production
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Health check endpoint
 app.get("/api/v1/healthcheck", (req, res) => {
-  res.json({ status: "healthy", timestamp: new Date() });
+  res.status(200).json({
+    success: true,
+    message: "Server is healthy",
+    data: {
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      environment: env.NODE_ENV,
+    },
+  });
 });
 
-// Route mounting
+// API Routes
 app.use("/api/v1/auth", authRoutes);
 
-// Global Error Handler
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: "Something went wrong!" });
+// Catch 404 for undefined routes
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+  });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Centralized Global Error Handler
+app.use(errorMiddleware);
 
 export default app;

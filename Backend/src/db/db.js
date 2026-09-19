@@ -2,19 +2,25 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "./schema.js";
-import dotenv from "dotenv";
+import * as relations from "./relations.js";
+import { env } from "../config/env.js";
 
-dotenv.config();
-
-if (!process.env.DATABASE_URL) {
+if (!env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not set in environment variables");
 }
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false // Required for Supabase connections
-  }
+    rejectUnauthorized: false, // Required for Supabase / Neon connections
+  },
 });
 
-export const db = drizzle(pool, { schema });
+export const db = drizzle(pool, {
+  schema: {
+    ...schema,
+    ...relations,
+  },
+});
+
+export default db;

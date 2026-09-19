@@ -1,5 +1,5 @@
 {
-  "id": "b5ff7db1-0b8d-49af-b4e6-70e90a4937e1",
+  "id": "3d5a3184-921d-4b3f-bc90-1b717bbff9d8",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -14,17 +14,17 @@
           "primaryKey": true,
           "notNull": true
         },
-        "laundry_record_id": {
-          "name": "laundry_record_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "student_id": {
           "name": "student_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
+        },
+        "laundry_id": {
+          "name": "laundry_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         },
         "category": {
           "name": "category",
@@ -57,6 +57,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "resolved_by": {
+          "name": "resolved_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -72,21 +84,24 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "complaints_student_id_idx": {
+          "name": "complaints_student_id_idx",
+          "columns": [
+            {
+              "expression": "student_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
-        "complaints_laundry_record_id_laundry_records_id_fk": {
-          "name": "complaints_laundry_record_id_laundry_records_id_fk",
-          "tableFrom": "complaints",
-          "tableTo": "laundry_records",
-          "columnsFrom": [
-            "laundry_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
         "complaints_student_id_users_id_fk": {
           "name": "complaints_student_id_users_id_fk",
           "tableFrom": "complaints",
@@ -98,6 +113,32 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "complaints_laundry_id_laundry_records_id_fk": {
+          "name": "complaints_laundry_id_laundry_records_id_fk",
+          "tableFrom": "complaints",
+          "tableTo": "laundry_records",
+          "columnsFrom": [
+            "laundry_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "complaints_resolved_by_users_id_fk": {
+          "name": "complaints_resolved_by_users_id_fk",
+          "tableFrom": "complaints",
+          "tableTo": "users",
+          "columnsFrom": [
+            "resolved_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -117,47 +158,321 @@
           "primaryKey": true,
           "notNull": true
         },
-        "laundry_record_id": {
-          "name": "laundry_record_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
         "student_id": {
           "name": "student_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
-        "rating": {
-          "name": "rating",
+        "laundry_id": {
+          "name": "laundry_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
-        },
-        "comments": {
-          "name": "comments",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "cleanliness_rating": {
           "name": "cleanliness_rating",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "timeliness_rating": {
           "name": "timeliness_rating",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "staff_service_rating": {
           "name": "staff_service_rating",
           "type": "integer",
           "primaryKey": false,
+          "notNull": true
+        },
+        "overall_rating": {
+          "name": "overall_rating",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "comment": {
+          "name": "comment",
+          "type": "text",
+          "primaryKey": false,
           "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "feedback_student_id_users_id_fk": {
+          "name": "feedback_student_id_users_id_fk",
+          "tableFrom": "feedback",
+          "tableTo": "users",
+          "columnsFrom": [
+            "student_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "feedback_laundry_id_laundry_records_id_fk": {
+          "name": "feedback_laundry_id_laundry_records_id_fk",
+          "tableFrom": "feedback",
+          "tableTo": "laundry_records",
+          "columnsFrom": [
+            "laundry_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.floors": {
+      "name": "floors",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "hostel_id": {
+          "name": "hostel_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "floor_number": {
+          "name": "floor_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "floors_hostel_id_hostels_id_fk": {
+          "name": "floors_hostel_id_hostels_id_fk",
+          "tableFrom": "floors",
+          "tableTo": "hostels",
+          "columnsFrom": [
+            "hostel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.holidays": {
+      "name": "holidays",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "holidays_created_by_users_id_fk": {
+          "name": "holidays_created_by_users_id_fk",
+          "tableFrom": "holidays",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "holidays_date_unique": {
+          "name": "holidays_date_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "date"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.hostels": {
+      "name": "hostels",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "hostels_code_unique": {
+          "name": "hostels_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.laundry_groups": {
+      "name": "laundry_groups",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "hostel_id": {
+          "name": "hostel_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "group_order": {
+          "name": "group_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "room_range_start": {
+          "name": "room_range_start",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "room_range_end": {
+          "name": "room_range_end",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
         },
         "created_at": {
           "name": "created_at",
@@ -176,25 +491,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "feedback_laundry_record_id_laundry_records_id_fk": {
-          "name": "feedback_laundry_record_id_laundry_records_id_fk",
-          "tableFrom": "feedback",
-          "tableTo": "laundry_records",
+        "laundry_groups_hostel_id_hostels_id_fk": {
+          "name": "laundry_groups_hostel_id_hostels_id_fk",
+          "tableFrom": "laundry_groups",
+          "tableTo": "hostels",
           "columnsFrom": [
-            "laundry_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "feedback_student_id_users_id_fk": {
-          "name": "feedback_student_id_users_id_fk",
-          "tableFrom": "feedback",
-          "tableTo": "users",
-          "columnsFrom": [
-            "student_id"
+            "hostel_id"
           ],
           "columnsTo": [
             "id"
@@ -225,17 +527,17 @@
           "primaryKey": false,
           "notNull": true
         },
-        "barcode": {
-          "name": "barcode",
-          "type": "text",
+        "schedule_id": {
+          "name": "schedule_id",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
-        "cloth_details": {
-          "name": "cloth_details",
-          "type": "jsonb",
+        "submitted_by_staff_id": {
+          "name": "submitted_by_staff_id",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "status": {
           "name": "status",
@@ -244,27 +546,33 @@
           "notNull": true,
           "default": "'received'"
         },
-        "otp_code": {
-          "name": "otp_code",
-          "type": "text",
+        "cloth_details": {
+          "name": "cloth_details",
+          "type": "jsonb",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "otp_expires_at": {
-          "name": "otp_expires_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "submission_time": {
-          "name": "submission_time",
+        "submitted_at": {
+          "name": "submitted_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "delivery_time": {
-          "name": "delivery_time",
+        "ready_at": {
+          "name": "ready_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delivered_at": {
+          "name": "delivered_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pickup_verified_at": {
+          "name": "pickup_verified_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": false
@@ -284,7 +592,38 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "laundry_records_student_id_idx": {
+          "name": "laundry_records_student_id_idx",
+          "columns": [
+            {
+              "expression": "student_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "laundry_records_status_idx": {
+          "name": "laundry_records_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "laundry_records_student_id_users_id_fk": {
           "name": "laundry_records_student_id_users_id_fk",
@@ -297,6 +636,32 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "laundry_records_schedule_id_schedules_id_fk": {
+          "name": "laundry_records_schedule_id_schedules_id_fk",
+          "tableFrom": "laundry_records",
+          "tableTo": "schedules",
+          "columnsFrom": [
+            "schedule_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "laundry_records_submitted_by_staff_id_users_id_fk": {
+          "name": "laundry_records_submitted_by_staff_id_users_id_fk",
+          "tableFrom": "laundry_records",
+          "tableTo": "users",
+          "columnsFrom": [
+            "submitted_by_staff_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -316,11 +681,23 @@
           "primaryKey": true,
           "notNull": true
         },
-        "item_name": {
-          "name": "item_name",
+        "reported_by_staff_id": {
+          "name": "reported_by_staff_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "category": {
           "name": "category",
@@ -332,12 +709,6 @@
           "name": "color",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
           "notNull": false
         },
         "image_url": {
@@ -346,11 +717,12 @@
           "primaryKey": false,
           "notNull": false
         },
-        "found_by": {
-          "name": "found_by",
-          "type": "integer",
+        "found_date": {
+          "name": "found_date",
+          "type": "timestamp",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "now()"
         },
         "status": {
           "name": "status",
@@ -359,14 +731,92 @@
           "notNull": true,
           "default": "'available'"
         },
-        "claimed_by": {
-          "name": "claimed_by",
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "lost_found_reported_by_staff_id_users_id_fk": {
+          "name": "lost_found_reported_by_staff_id_users_id_fk",
+          "tableFrom": "lost_found",
+          "tableTo": "users",
+          "columnsFrom": [
+            "reported_by_staff_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.lost_found_claims": {
+      "name": "lost_found_claims",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "reviewed_by": {
+          "name": "reviewed_by",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
-        "claim_remarks": {
-          "name": "claim_remarks",
+        "reviewed_at": {
+          "name": "reviewed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "remarks": {
+          "name": "remarks",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -388,12 +838,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "lost_found_found_by_users_id_fk": {
-          "name": "lost_found_found_by_users_id_fk",
-          "tableFrom": "lost_found",
-          "tableTo": "users",
+        "lost_found_claims_item_id_lost_found_id_fk": {
+          "name": "lost_found_claims_item_id_lost_found_id_fk",
+          "tableFrom": "lost_found_claims",
+          "tableTo": "lost_found",
           "columnsFrom": [
-            "found_by"
+            "item_id"
           ],
           "columnsTo": [
             "id"
@@ -401,12 +851,25 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "lost_found_claimed_by_users_id_fk": {
-          "name": "lost_found_claimed_by_users_id_fk",
-          "tableFrom": "lost_found",
+        "lost_found_claims_student_id_users_id_fk": {
+          "name": "lost_found_claims_student_id_users_id_fk",
+          "tableFrom": "lost_found_claims",
           "tableTo": "users",
           "columnsFrom": [
-            "claimed_by"
+            "student_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "lost_found_claims_reviewed_by_users_id_fk": {
+          "name": "lost_found_claims_reviewed_by_users_id_fk",
+          "tableFrom": "lost_found_claims",
+          "tableTo": "users",
+          "columnsFrom": [
+            "reviewed_by"
           ],
           "columnsTo": [
             "id"
@@ -437,6 +900,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "title": {
           "name": "title",
           "type": "text",
@@ -456,28 +925,31 @@
           "notNull": true,
           "default": false
         },
-        "type": {
-          "name": "type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "notifications_user_id_idx": {
+          "name": "notifications_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "notifications_user_id_users_id_fk": {
           "name": "notifications_user_id_users_id_fk",
@@ -499,8 +971,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.schedule_bookings": {
-      "name": "schedule_bookings",
+    "public.rooms": {
+      "name": "rooms",
       "schema": "",
       "columns": {
         "id": {
@@ -509,15 +981,15 @@
           "primaryKey": true,
           "notNull": true
         },
-        "schedule_id": {
-          "name": "schedule_id",
+        "floor_id": {
+          "name": "floor_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
-        "student_id": {
-          "name": "student_id",
-          "type": "integer",
+        "room_number": {
+          "name": "room_number",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -526,17 +998,10 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'booked'"
+          "default": "'active'"
         },
         "created_at": {
           "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
@@ -545,25 +1010,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "schedule_bookings_schedule_id_schedules_id_fk": {
-          "name": "schedule_bookings_schedule_id_schedules_id_fk",
-          "tableFrom": "schedule_bookings",
-          "tableTo": "schedules",
+        "rooms_floor_id_floors_id_fk": {
+          "name": "rooms_floor_id_floors_id_fk",
+          "tableFrom": "rooms",
+          "tableTo": "floors",
           "columnsFrom": [
-            "schedule_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "schedule_bookings_student_id_users_id_fk": {
-          "name": "schedule_bookings_student_id_users_id_fk",
-          "tableFrom": "schedule_bookings",
-          "tableTo": "users",
-          "columnsFrom": [
-            "student_id"
+            "floor_id"
           ],
           "columnsTo": [
             "id"
@@ -588,30 +1040,48 @@
           "primaryKey": true,
           "notNull": true
         },
-        "date": {
-          "name": "date",
-          "type": "text",
+        "schedule_date": {
+          "name": "schedule_date",
+          "type": "date",
           "primaryKey": false,
           "notNull": true
         },
-        "time_slot": {
-          "name": "time_slot",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "capacity": {
-          "name": "capacity",
+        "group_id": {
+          "name": "group_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
-        "current_bookings": {
-          "name": "current_bookings",
-          "type": "integer",
+        "start_time": {
+          "name": "start_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "end_time": {
+          "name": "end_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": 0
+          "default": "'scheduled'"
+        },
+        "rotation_position": {
+          "name": "rotation_position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -628,8 +1098,51 @@
           "default": "now()"
         }
       },
-      "indexes": {},
-      "foreignKeys": {},
+      "indexes": {
+        "schedules_date_idx": {
+          "name": "schedules_date_idx",
+          "columns": [
+            {
+              "expression": "schedule_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "schedules_group_id_laundry_groups_id_fk": {
+          "name": "schedules_group_id_laundry_groups_id_fk",
+          "tableFrom": "schedules",
+          "tableTo": "laundry_groups",
+          "columnsFrom": [
+            "group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "schedules_created_by_users_id_fk": {
+          "name": "schedules_created_by_users_id_fk",
+          "tableFrom": "schedules",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -676,20 +1189,38 @@
           "primaryKey": false,
           "notNull": false
         },
-        "hostel_block": {
-          "name": "hostel_block",
+        "employee_id": {
+          "name": "employee_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "room_no": {
-          "name": "room_no",
+        "phone": {
+          "name": "phone",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "barcode": {
-          "name": "barcode",
+        "hostel_id": {
+          "name": "hostel_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "floor_id": {
+          "name": "floor_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "room_id": {
+          "name": "room_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "barcode_value": {
+          "name": "barcode_value",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -716,8 +1247,94 @@
           "default": "now()"
         }
       },
-      "indexes": {},
-      "foreignKeys": {},
+      "indexes": {
+        "users_email_idx": {
+          "name": "users_email_idx",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "users_student_id_idx": {
+          "name": "users_student_id_idx",
+          "columns": [
+            {
+              "expression": "student_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "users_barcode_value_idx": {
+          "name": "users_barcode_value_idx",
+          "columns": [
+            {
+              "expression": "barcode_value",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "users_hostel_id_hostels_id_fk": {
+          "name": "users_hostel_id_hostels_id_fk",
+          "tableFrom": "users",
+          "tableTo": "hostels",
+          "columnsFrom": [
+            "hostel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "users_floor_id_floors_id_fk": {
+          "name": "users_floor_id_floors_id_fk",
+          "tableFrom": "users",
+          "tableTo": "floors",
+          "columnsFrom": [
+            "floor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "users_room_id_rooms_id_fk": {
+          "name": "users_room_id_rooms_id_fk",
+          "tableFrom": "users",
+          "tableTo": "rooms",
+          "columnsFrom": [
+            "room_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "users_email_unique": {
@@ -727,11 +1344,11 @@
             "email"
           ]
         },
-        "users_barcode_unique": {
-          "name": "users_barcode_unique",
+        "users_barcode_value_unique": {
+          "name": "users_barcode_value_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "barcode"
+            "barcode_value"
           ]
         }
       },
