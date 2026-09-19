@@ -102,7 +102,10 @@ describe("Phase 4: Holiday Management & Auto-Shift", () => {
   const adminToken = createToken({ id: 1, role: "admin", email: "admin@vwash.com" });
   const studentToken = createToken({ id: 3, role: "student", email: "student@vwash.com" });
 
-  const holidayDate = `2026-12-${Math.floor(10 + Math.random() * 18)}`;
+  const randYear = 2030 + Math.floor(Math.random() * 50);
+  const randMonth = String(1 + Math.floor(Math.random() * 12)).padStart(2, "0");
+  const randDay = String(1 + Math.floor(Math.random() * 28)).padStart(2, "0");
+  const holidayDate = `${randYear}-${randMonth}-${randDay}`;
 
   it("should allow Admin to create a holiday (201)", async () => {
     const res = await makeRequest("POST", "/api/v1/schedules/holidays", {
