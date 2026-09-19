@@ -6,6 +6,7 @@ import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import hostelRoutes from "./routes/hostelRoutes.js";
 import laundryGroupRoutes from "./routes/laundryGroupRoutes.js";
+import scheduleRoutes from "./routes/scheduleRoutes.js";
 import { errorMiddleware } from "./middleware/errorMiddleware.js";
 
 const app = express();
@@ -39,6 +40,7 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/hostels", hostelRoutes);
 app.use("/api/v1/laundry-groups", laundryGroupRoutes);
+app.use("/api/v1/schedules", scheduleRoutes);
 
 // Catch 404 for undefined routes
 app.use((req, res) => {
