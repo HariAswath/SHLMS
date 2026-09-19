@@ -12,6 +12,7 @@ import complaintRoutes from "./routes/complaintRoutes.js";
 import lostFoundRoutes from "./routes/lostFoundRoutes.js";
 import feedbackRoutes from "./routes/feedbackRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import reportRoutes from "./routes/reportRoutes.js";
 import { errorMiddleware } from "./middleware/errorMiddleware.js";
 
 const app = express();
@@ -51,6 +52,7 @@ app.use("/api/v1/complaints", complaintRoutes);
 app.use("/api/v1/lost-found", lostFoundRoutes);
 app.use("/api/v1/feedback", feedbackRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/reports", reportRoutes);
 
 // Catch 404 for undefined routes
 app.use((req, res) => {
