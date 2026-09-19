@@ -4,6 +4,8 @@ import cookieParser from "cookie-parser";
 import { env } from "./config/env.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+import hostelRoutes from "./routes/hostelRoutes.js";
+import laundryGroupRoutes from "./routes/laundryGroupRoutes.js";
 import { errorMiddleware } from "./middleware/errorMiddleware.js";
 
 const app = express();
@@ -35,6 +37,8 @@ app.get("/api/v1/healthcheck", (req, res) => {
 // API Routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/hostels", hostelRoutes);
+app.use("/api/v1/laundry-groups", laundryGroupRoutes);
 
 // Catch 404 for undefined routes
 app.use((req, res) => {
