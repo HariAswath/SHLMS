@@ -26,20 +26,39 @@ export const resolveGroupByRoom = async (hostelId, roomNumber) => {
   const isNumeric = !isNaN(numericRoom);
 
   for (const group of groups) {
-    if (!group.roomRangeStart || !group.roomRangeEnd) continue;
+    if (!group.roomRangeStart) continue;
 
     const startStr = group.roomRangeStart.trim();
-    const endStr = group.roomRangeEnd.trim();
+    const endStr = group.roomRangeEnd ? group.roomRangeEnd.trim() : startStr;
+
+    // 1. Check comma/space separated list of room numbers
+    if (startStr.includes(",") || endStr.includes(",")) {
+      const roomList = `${startStr},${endStr}`
+        .split(/[, ]+/)
+        .map((r) => r.trim())
+        .filter(Boolean);
+      if (roomList.includes(rawRoomStr)) {
+        return group;
+      }
+    }
+
+    // 2. Direct exact match
+    if (rawRoomStr === startStr || rawRoomStr === endStr) {
+      return group;
+    }
+
     const startNum = parseInt(startStr, 10);
     const endNum = parseInt(endStr, 10);
 
-    // 1. If both group boundaries and the room number are numeric (e.g. 101 to 233 and room 105)
+    // 3. Numeric range check
     if (isNumeric && !isNaN(startNum) && !isNaN(endNum)) {
-      if (numericRoom >= startNum && numericRoom <= endNum) {
+      const min = Math.min(startNum, endNum);
+      const max = Math.max(startNum, endNum);
+      if (numericRoom >= min && numericRoom <= max) {
         return group;
       }
     } else {
-      // 2. Fallback to alphanumeric string comparison
+      // 4. Fallback to alphanumeric string comparison
       if (rawRoomStr.localeCompare(startStr) >= 0 && rawRoomStr.localeCompare(endStr) <= 0) {
         return group;
       }

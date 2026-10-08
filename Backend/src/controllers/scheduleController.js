@@ -147,6 +147,7 @@ export const getMySchedule = async (req, res, next) => {
       where: eq(users.id, req.user.id),
       with: {
         room: true,
+        floor: true,
         hostel: true,
       },
     });
@@ -155,11 +156,22 @@ export const getMySchedule = async (req, res, next) => {
       throw new AppError("Only student accounts have an assigned laundry schedule", 403);
     }
 
+    const studentPayload = {
+      id: studentUser.id,
+      name: studentUser.name,
+      studentId: studentUser.studentId,
+      room: studentUser.room?.roomNumber || null,
+      hostel: studentUser.hostel?.name || null,
+      floor: studentUser.floor?.name || null,
+      barcodeValue: studentUser.barcodeValue,
+    };
+
     if (!studentUser.hostelId || !studentUser.room?.roomNumber) {
       return res.status(200).json({
         success: true,
         message: "Student room assignment is pending",
         data: {
+          student: studentPayload,
           assignedGroup: null,
           isScheduledToday: false,
           nextScheduleDate: null,
@@ -179,6 +191,7 @@ export const getMySchedule = async (req, res, next) => {
         success: true,
         message: "No active laundry group covers this room",
         data: {
+          student: studentPayload,
           assignedGroup: null,
           isScheduledToday: false,
           nextScheduleDate: null,
@@ -189,44 +202,75 @@ export const getMySchedule = async (req, res, next) => {
 
     const todayStr = new Date().toISOString().split("T")[0];
 
-    // Check if scheduled today
-    const [todaySched] = await db
+    // Check if today is a Holiday
+    const [todayHoliday] = await db
       .select()
-      .from(schedules)
-      .where(
-        and(
-          eq(schedules.groupId, studentGroup.id),
-          eq(schedules.scheduleDate, todayStr),
-          eq(schedules.status, "scheduled")
-        )
-      )
+      .from(holidays)
+      .where(eq(holidays.date, todayStr))
       .limit(1);
+
+    // Fetch upcoming holidays from today onwards
+    const upcomingHolidays = await db
+      .select()
+      .from(holidays)
+      .where(gte(holidays.date, todayStr))
+      .orderBy(asc(holidays.date));
+    const holidayDateMap = new Map(upcomingHolidays.map((h) => [h.date, h.reason]));
+
+    // Check if scheduled today (strictly false if today is a holiday!)
+    let isScheduledToday = false;
+    if (!todayHoliday) {
+      const [todaySched] = await db
+        .select()
+        .from(schedules)
+        .where(
+          and(
+            eq(schedules.groupId, studentGroup.id),
+            eq(schedules.scheduleDate, todayStr),
+            eq(schedules.status, "scheduled")
+          )
+        )
+        .limit(1);
+      isScheduledToday = Boolean(todaySched);
+    }
 
     // Fetch upcoming schedules for this student's group
     const upcoming = await db.query.schedules.findMany({
       where: and(
         eq(schedules.groupId, studentGroup.id),
-        gte(schedules.scheduleDate, todayStr)
+        gte(schedules.scheduleDate, todayStr),
+        eq(schedules.status, "scheduled")
       ),
-      limit: 10,
+      limit: 15,
       orderBy: [asc(schedules.scheduleDate)],
     });
+
+    // CRITICAL: Remove any laundry schedule on announced holiday dates!
+    const validUpcoming = upcoming.filter((s) => !holidayDateMap.has(s.scheduleDate));
+
+    // Determine the next working laundry day
+    let nextScheduleDate = null;
+    if (validUpcoming.length > 0) {
+      if (todayHoliday) {
+        // If today is a holiday, next laundry schedule must be strictly after today!
+        const nextDay = validUpcoming.find((s) => s.scheduleDate > todayStr);
+        nextScheduleDate = nextDay ? nextDay.scheduleDate : validUpcoming[0].scheduleDate;
+      } else {
+        nextScheduleDate = validUpcoming[0].scheduleDate;
+      }
+    }
 
     return res.status(200).json({
       success: true,
       message: "Student schedule retrieved successfully",
       data: {
-        student: {
-          id: studentUser.id,
-          name: studentUser.name,
-          studentId: studentUser.studentId,
-          room: studentUser.room.roomNumber,
-          barcodeValue: studentUser.barcodeValue,
-        },
+        student: studentPayload,
         assignedGroup: studentGroup,
-        isScheduledToday: Boolean(todaySched),
-        nextScheduleDate: upcoming.length > 0 ? upcoming[0].scheduleDate : null,
-        upcomingSchedules: upcoming,
+        isScheduledToday,
+        todayHoliday: todayHoliday || null,
+        nextScheduleDate,
+        upcomingSchedules: validUpcoming,
+        holidays: upcomingHolidays,
       },
     });
   } catch (error) {
@@ -359,6 +403,9 @@ export const createHoliday = async (req, res, next) => {
       })
       .returning();
 
+    // Remove any schedule currently allocated on this holiday date so students never see it
+    await db.delete(schedules).where(eq(schedules.scheduleDate, date));
+
     let shiftResult = null;
     if (shiftFutureSchedules) {
       shiftResult = await shiftFutureSchedulesOnHoliday(date, req.user.id);
@@ -433,6 +480,8 @@ export const updateHoliday = async (req, res, next) => {
         throw new AppError(`A holiday on date '${date}' already exists`, 409);
       }
       updateData.date = date;
+      // Remove schedule on new date
+      await db.delete(schedules).where(eq(schedules.scheduleDate, date));
     }
 
     const [updated] = await db
@@ -447,6 +496,37 @@ export const updateHoliday = async (req, res, next) => {
       data: {
         holiday: updated,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==========================================
+// 10. Delete Holiday (Admin Only)
+// ==========================================
+export const deleteHoliday = async (req, res, next) => {
+  try {
+    const holidayId = parseInt(req.params.id, 10);
+    if (isNaN(holidayId)) {
+      throw new AppError("Invalid holiday ID parameter", 400);
+    }
+
+    const [existing] = await db
+      .select()
+      .from(holidays)
+      .where(eq(holidays.id, holidayId))
+      .limit(1);
+
+    if (!existing) {
+      throw new AppError("Holiday record not found", 404);
+    }
+
+    await db.delete(holidays).where(eq(holidays.id, holidayId));
+
+    return res.status(200).json({
+      success: true,
+      message: `Holiday on '${existing.date}' deleted successfully`,
     });
   } catch (error) {
     next(error);

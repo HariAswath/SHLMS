@@ -45,6 +45,9 @@ export const createUser = async (req, res, next) => {
     }
 
     let resolvedBarcode = barcodeValue ? barcodeValue.trim() : null;
+    let resolvedRoomId = roomId || null;
+    let resolvedFloorId = floorId || null;
+    let resolvedHostelId = hostelId || null;
 
     // 2. Validate Student Specifics
     if (role === "student") {
@@ -77,12 +80,29 @@ export const createUser = async (req, res, next) => {
         throw new AppError(`Barcode '${resolvedBarcode}' is already assigned to another student`, 409);
       }
 
+      if (!resolvedRoomId && req.body.roomNumber) {
+        const targetRoomNumber = String(req.body.roomNumber).trim();
+        const foundRooms = await db.query.rooms.findMany({
+          where: eq(rooms.roomNumber, targetRoomNumber),
+          with: { floor: { with: { hostel: true } } },
+        });
+
+        if (foundRooms.length > 0) {
+          const matched = resolvedHostelId
+            ? foundRooms.find((r) => r.floor.hostelId === resolvedHostelId) || foundRooms[0]
+            : foundRooms[0];
+          resolvedRoomId = matched.id;
+          resolvedFloorId = matched.floorId;
+          resolvedHostelId = matched.floor.hostelId;
+        }
+      }
+
       // Validate hostel reference if provided
-      if (hostelId) {
+      if (resolvedHostelId) {
         const foundHostel = await db
           .select({ id: hostels.id })
           .from(hostels)
-          .where(eq(hostels.id, hostelId))
+          .where(eq(hostels.id, resolvedHostelId))
           .limit(1);
         if (foundHostel.length === 0) {
           throw new AppError("Referenced hostel does not exist", 404);
@@ -90,31 +110,31 @@ export const createUser = async (req, res, next) => {
       }
 
       // Validate floor reference if provided
-      if (floorId) {
+      if (resolvedFloorId) {
         const foundFloor = await db
           .select({ id: floors.id, hostelId: floors.hostelId })
           .from(floors)
-          .where(eq(floors.id, floorId))
+          .where(eq(floors.id, resolvedFloorId))
           .limit(1);
         if (foundFloor.length === 0) {
           throw new AppError("Referenced floor does not exist", 404);
         }
-        if (hostelId && foundFloor[0].hostelId !== hostelId) {
+        if (resolvedHostelId && foundFloor[0].hostelId !== resolvedHostelId) {
           throw new AppError("Floor does not belong to the selected hostel", 400);
         }
       }
 
       // Validate room reference if provided
-      if (roomId) {
+      if (resolvedRoomId) {
         const foundRoom = await db
           .select({ id: rooms.id, floorId: rooms.floorId })
           .from(rooms)
-          .where(eq(rooms.id, roomId))
+          .where(eq(rooms.id, resolvedRoomId))
           .limit(1);
         if (foundRoom.length === 0) {
           throw new AppError("Referenced room does not exist", 404);
         }
-        if (floorId && foundRoom[0].floorId !== floorId) {
+        if (resolvedFloorId && foundRoom[0].floorId !== resolvedFloorId) {
           throw new AppError("Room does not belong to the selected floor", 400);
         }
       }
@@ -149,9 +169,9 @@ export const createUser = async (req, res, next) => {
         studentId: role === "student" ? studentId.trim() : null,
         employeeId: role === "staff" ? employeeId.trim() : null,
         phone: phone ? phone.trim() : null,
-        hostelId: role === "student" ? hostelId || null : null,
-        floorId: role === "student" ? floorId || null : null,
-        roomId: role === "student" ? roomId || null : null,
+        hostelId: role === "student" ? resolvedHostelId : null,
+        floorId: role === "student" ? resolvedFloorId : null,
+        roomId: role === "student" ? resolvedRoomId : null,
         barcodeValue: role === "student" ? resolvedBarcode : null,
         status: status || "active",
       })
@@ -390,9 +410,25 @@ export const updateUser = async (req, res, next) => {
         }
       }
 
-      if (hostelId !== undefined) updateData.hostelId = hostelId;
-      if (floorId !== undefined) updateData.floorId = floorId;
-      if (roomId !== undefined) updateData.roomId = roomId;
+      if (req.body.roomNumber !== undefined && roomId === undefined) {
+        const targetRoomNumber = String(req.body.roomNumber).trim();
+        const foundRooms = await db.query.rooms.findMany({
+          where: eq(rooms.roomNumber, targetRoomNumber),
+          with: { floor: { with: { hostel: true } } },
+        });
+        if (foundRooms.length > 0) {
+          const matched = hostelId
+            ? foundRooms.find((r) => r.floor.hostelId === hostelId) || foundRooms[0]
+            : foundRooms[0];
+          updateData.roomId = matched.id;
+          updateData.floorId = matched.floorId;
+          updateData.hostelId = matched.floor.hostelId;
+        }
+      } else {
+        if (hostelId !== undefined) updateData.hostelId = hostelId;
+        if (floorId !== undefined) updateData.floorId = floorId;
+        if (roomId !== undefined) updateData.roomId = roomId;
+      }
     } else if (existingUser.role === "staff") {
       if (employeeId !== undefined) {
         const trimmed = employeeId.trim();

@@ -142,7 +142,11 @@ export function Shell({ navItems }) {
             <NotificationBell />
             <div className="hidden text-right sm:block">
               <p className="text-sm font-medium text-slate-800" data-testid="user-name">{user.name}</p>
-              <p className="text-[11px] text-slate-400">{ROLE_LABEL[user.role]}</p>
+              <p className="text-[11px] text-slate-400">
+                {user.role === "student" && user.room?.roomNumber
+                  ? `Room ${user.room.roomNumber}${user.hostel?.name ? ` • ${user.hostel.name}` : ""}`
+                  : ROLE_LABEL[user.role]}
+              </p>
             </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
               {initials(user.name)}

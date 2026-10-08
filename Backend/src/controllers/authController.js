@@ -29,40 +29,31 @@ const generateRefreshToken = (user) => {
   );
 };
 
-const formatSafeUser = (user) => ({
-  id: user.id,
-  name: user.name,
-  email: user.email,
-  role: user.role,
-  studentId: user.studentId,
-  employeeId: user.employeeId,
-  phone: user.phone,
-  hostelId: user.hostelId,
-  floorId: user.floorId,
-  roomId: user.roomId,
-  barcodeValue: user.barcodeValue,
-  status: user.status,
-  createdAt: user.createdAt,
-});
+const formatSafeUser = (user) => {
+  if (!user) return null;
+  const { passwordHash, ...safe } = user;
+  return safe;
+};
 
 export const login = async (req, res, next) => {
   const { email, password } = req.body;
 
   try {
-    const foundUsers = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email.toLowerCase().trim()))
-      .limit(1);
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, email.toLowerCase().trim()),
+      with: {
+        hostel: true,
+        floor: true,
+        room: true,
+      },
+    });
 
-    if (foundUsers.length === 0) {
+    if (!user) {
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
       });
     }
-
-    const user = foundUsers[0];
 
     if (user.status !== "active") {
       return res.status(403).json({
@@ -167,20 +158,22 @@ export const refresh = async (req, res, next) => {
 
 export const me = async (req, res, next) => {
   try {
-    const foundUsers = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, req.user.id))
-      .limit(1);
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, req.user.id),
+      with: {
+        hostel: true,
+        floor: true,
+        room: true,
+      },
+    });
 
-    if (foundUsers.length === 0) {
+    if (!user) {
       return res.status(404).json({
         success: false,
         message: "User not found",
       });
     }
 
-    const user = foundUsers[0];
     return res.status(200).json({
       success: true,
       message: "User profile retrieved successfully",

@@ -10,7 +10,10 @@ import { useLoad } from "../../lib/useLoad.js";
 import { STATUS_LABEL, fmtDate } from "../../lib/util.js";
 import { clothSummary, pickCurrent, timelineOf } from "../../lib/laundry.js";
 
+import { useAuth } from "../../auth/AuthContext.jsx";
+
 export default function StudentOverview() {
+  const { user } = useAuth();
   const [feedbackTarget, setFeedbackTarget] = useState(null);
 
   const { data, error, loading, retry, reload } = useLoad(async () => {
@@ -68,19 +71,85 @@ export default function StudentOverview() {
   const group = sched.assignedGroup;
   const stepperState = current ? current.status : "scheduled";
 
+  const studentRoom = sched.student?.room || user?.room?.roomNumber;
+  const studentHostel = sched.student?.hostel || user?.hostel?.name;
+  const studentFloor = sched.student?.floor || user?.floor?.name;
+
+  const isHolidayToday = Boolean(today.isHoliday || sched.todayHoliday);
+  const holidayReason = today.holiday?.reason || sched.todayHoliday?.reason;
+
   let todayText = "No laundry today";
   let todaySub = "Check upcoming dates below";
-  if (today.isHoliday) { todayText = "Holiday"; todaySub = today.holiday?.reason; }
-  else if (sched.isScheduledToday) { todayText = "Your group is on"; todaySub = "Bring your clothes to the laundry counter"; }
-  else if (today.schedule?.group) { todaySub = `Today is ${today.schedule.group.name}`; }
+  if (isHolidayToday) {
+    todayText = "Holiday";
+    todaySub = `${holidayReason || "Announced Holiday"} — No collection today`;
+  } else if (sched.isScheduledToday) {
+    todayText = "Your group is on";
+    todaySub = "Bring your clothes to the laundry counter";
+  } else if (today.schedule?.group) {
+    todaySub = `Today is ${today.schedule.group.name}`;
+  }
 
   return (
     <div className="space-y-6">
+      {/* Holiday Announcement Alert Banner */}
+      {isHolidayToday && (
+        <div className="flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-900">
+          <span className="text-2xl">🏖️</span>
+          <div>
+            <p className="font-semibold text-rose-950">
+              Today is an Announced Holiday ({holidayReason || "Hostel Holiday"})
+            </p>
+            <p className="text-xs text-rose-800">
+              Laundry collection is paused today. Your next laundry day has been automatically removed from today and shifted to{" "}
+              <strong>{sched.nextScheduleDate ? fmtDate(sched.nextScheduleDate) : "the next working day"}</strong>.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Your laundry group" value={group ? group.name : "Not assigned"} sub={group ? `Rooms ${group.roomRangeStart}–${group.roomRangeEnd}` : "Room assignment pending"} icon={Users} />
-        <StatCard label="Today" value={todayText} sub={todaySub} icon={CalendarCheck} tint={sched.isScheduledToday ? "emerald" : "slate"} />
-        <StatCard label="Next laundry day" value={sched.nextScheduleDate ? fmtDate(sched.nextScheduleDate) : "—"} sub={sched.nextScheduleDate ? "For your group" : "No upcoming date scheduled"} icon={CalendarDays} tint="amber" />
-        <StatCard label="Current status" value={current ? STATUS_LABEL[current.status] : "Nothing submitted"} sub={current ? clothSummary(current.clothDetails) : "Submit at the counter on your day"} icon={PackageCheck} tint="emerald" />
+        <StatCard
+          label="Your laundry group"
+          value={group ? group.name : (studentRoom ? "Group Pending" : "Not assigned")}
+          sub={
+            studentRoom
+              ? `Room ${studentRoom} • ${studentHostel || "Hostel"}`
+              : "Room assignment pending"
+          }
+          icon={Users}
+        />
+        <StatCard
+          label="Today"
+          value={todayText}
+          sub={todaySub}
+          icon={CalendarCheck}
+          tint={isHolidayToday ? "rose" : sched.isScheduledToday ? "emerald" : "slate"}
+        />
+        <StatCard
+          label="Next laundry day"
+          value={sched.nextScheduleDate ? fmtDate(sched.nextScheduleDate) : "—"}
+          sub={
+            sched.nextScheduleDate
+              ? isHolidayToday
+                ? "Shifted after holiday"
+                : group
+                ? `For ${group.name}`
+                : "For your group"
+              : group
+              ? "No upcoming date scheduled"
+              : "Awaiting admin group creation"
+          }
+          icon={CalendarDays}
+          tint="amber"
+        />
+        <StatCard
+          label="Current status"
+          value={current ? STATUS_LABEL[current.status] : "Nothing submitted"}
+          sub={current ? clothSummary(current.clothDetails) : "Submit at the counter on your day"}
+          icon={PackageCheck}
+          tint="emerald"
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -98,12 +167,24 @@ export default function StudentOverview() {
 
         <Card className="p-6 text-center" data-testid="my-qr">
           <SectionHeader title="My QR code" subtitle="Show this at the laundry counter" className="text-left" />
-          {sched.student?.barcodeValue ? (
+          {sched.student?.barcodeValue || user?.barcodeValue ? (
             <>
               <div className="mx-auto inline-block rounded-xl border border-slate-200 bg-white p-3">
-                <QRCodeSVG value={sched.student.barcodeValue} size={168} />
+                <QRCodeSVG value={sched.student?.barcodeValue || user?.barcodeValue} size={168} />
               </div>
-              <p className="mt-3 font-mono text-xs text-slate-500" data-testid="my-barcode">{sched.student.barcodeValue}</p>
+              <p className="mt-3 font-mono text-xs text-slate-500" data-testid="my-barcode">
+                {sched.student?.barcodeValue || user?.barcodeValue}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-xs">
+                <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 font-medium text-indigo-700">
+                  Room {studentRoom || "Unassigned"}
+                </span>
+                {studentHostel && (
+                  <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-slate-600">
+                    {studentHostel} {studentFloor ? `(${studentFloor})` : ""}
+                  </span>
+                )}
+              </div>
             </>
           ) : (
             <p className="py-8 text-sm text-slate-400">No QR assigned yet. Contact the hostel office.</p>
@@ -112,18 +193,32 @@ export default function StudentOverview() {
       </div>
 
       <Card className="p-6">
-        <SectionHeader title="Upcoming laundry days" subtitle={group ? `${group.name} schedule` : undefined} />
+        <SectionHeader
+          title="Upcoming laundry days"
+          subtitle={group ? `${group.name} schedule (holidays excluded & shifted)` : undefined}
+        />
         {sched.upcomingSchedules?.length ? (
           <ul className="divide-y divide-slate-100">
-            {sched.upcomingSchedules.map((s) => (
+            {sched.upcomingSchedules.map((s, idx) => (
               <li key={s.id} className="flex items-center justify-between py-3 text-sm">
-                <span className="font-medium text-slate-800">{fmtDate(s.scheduleDate)}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`font-medium ${idx === 0 ? "font-semibold text-indigo-700" : "text-slate-800"}`}>
+                    {fmtDate(s.scheduleDate)}
+                  </span>
+                  {idx === 0 && (
+                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                      Next up
+                    </span>
+                  )}
+                </div>
                 <span className="text-slate-500">{s.startTime}–{s.endTime}</span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="py-6 text-center text-sm text-slate-400">No upcoming laundry days have been scheduled yet.</p>
+          <p className="py-6 text-center text-sm text-slate-400">
+            {group ? "No upcoming laundry days have been scheduled yet." : "Laundry group has not been configured by administration yet."}
+          </p>
         )}
       </Card>
 

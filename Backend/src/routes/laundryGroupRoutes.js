@@ -4,6 +4,8 @@ import {
   getLaundryGroups,
   getLaundryGroupById,
   updateLaundryGroup,
+  deleteLaundryGroup,
+  deleteAllLaundryGroups,
   resolveGroup,
 } from "../controllers/laundryGroupController.js";
 import { authenticateToken, requireRole } from "../middleware/authMiddleware.js";
@@ -28,6 +30,7 @@ router.post(
   createLaundryGroup
 );
 router.get("/", getLaundryGroups);
+router.delete("/all", requireRole("admin"), deleteAllLaundryGroups);
 router.get("/:id", getLaundryGroupById);
 router.patch(
   "/:id",
@@ -35,5 +38,6 @@ router.patch(
   validate(updateLaundryGroupSchema),
   updateLaundryGroup
 );
+router.delete("/:id", requireRole("admin"), deleteLaundryGroup);
 
 export default router;

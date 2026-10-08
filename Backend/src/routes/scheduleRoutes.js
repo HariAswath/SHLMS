@@ -9,6 +9,7 @@ import {
   createHoliday,
   getHolidays,
   updateHoliday,
+  deleteHoliday,
 } from "../controllers/scheduleController.js";
 import { authenticateToken, requireRole } from "../middleware/authMiddleware.js";
 import { validate } from "../middleware/validationMiddleware.js";
@@ -39,6 +40,11 @@ router.patch(
   requireRole("admin"),
   validate(updateHolidaySchema),
   updateHoliday
+);
+router.delete(
+  "/holidays/:id",
+  requireRole("admin"),
+  deleteHoliday
 );
 
 // ==========================================

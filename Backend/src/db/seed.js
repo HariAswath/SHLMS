@@ -101,38 +101,42 @@ async function seed() {
       createdRooms[roomStr] = existingRoom;
     }
 
-    // 5. Create Laundry Groups (G1 to G5)
-    console.log("-> Seeding Laundry Groups (G1 to G5)...");
-    const groupDefinitions = [
-      { name: "Group 1", groupOrder: 1, roomRangeStart: "101", roomRangeEnd: "103" },
-      { name: "Group 2", groupOrder: 2, roomRangeStart: "104", roomRangeEnd: "106" },
-      { name: "Group 3", groupOrder: 3, roomRangeStart: "107", roomRangeEnd: "109" },
-      { name: "Group 4", groupOrder: 4, roomRangeStart: "110", roomRangeEnd: "112" },
-      { name: "Group 5", groupOrder: 5, roomRangeStart: "113", roomRangeEnd: "115" },
-    ];
-
+    // 5. Laundry Groups (Configured dynamically by Admin)
     const createdGroups = [];
-    for (const g of groupDefinitions) {
-      let [existingGroup] = await db
-        .select()
-        .from(laundryGroups)
-        .where(eq(laundryGroups.groupOrder, g.groupOrder))
-        .limit(1);
+    if (process.env.SEED_DEFAULT_GROUPS === "true") {
+      console.log("-> Seeding Laundry Groups (G1 to G5)...");
+      const groupDefinitions = [
+        { name: "Group 1", groupOrder: 1, roomRangeStart: "101", roomRangeEnd: "103" },
+        { name: "Group 2", groupOrder: 2, roomRangeStart: "104", roomRangeEnd: "106" },
+        { name: "Group 3", groupOrder: 3, roomRangeStart: "107", roomRangeEnd: "109" },
+        { name: "Group 4", groupOrder: 4, roomRangeStart: "110", roomRangeEnd: "112" },
+        { name: "Group 5", groupOrder: 5, roomRangeStart: "113", roomRangeEnd: "115" },
+      ];
 
-      if (!existingGroup) {
-        [existingGroup] = await db
-          .insert(laundryGroups)
-          .values({
-            hostelId: hostel.id,
-            name: g.name,
-            groupOrder: g.groupOrder,
-            roomRangeStart: g.roomRangeStart,
-            roomRangeEnd: g.roomRangeEnd,
-            status: "active",
-          })
-          .returning();
+      for (const g of groupDefinitions) {
+        let [existingGroup] = await db
+          .select()
+          .from(laundryGroups)
+          .where(eq(laundryGroups.groupOrder, g.groupOrder))
+          .limit(1);
+
+        if (!existingGroup) {
+          [existingGroup] = await db
+            .insert(laundryGroups)
+            .values({
+              hostelId: hostel.id,
+              name: g.name,
+              groupOrder: g.groupOrder,
+              roomRangeStart: g.roomRangeStart,
+              roomRangeEnd: g.roomRangeEnd,
+              status: "active",
+            })
+            .returning();
+        }
+        createdGroups.push(existingGroup);
       }
-      createdGroups.push(existingGroup);
+    } else {
+      console.log("-> Laundry Groups are NOT predefined. Admin configures groups dynamically.");
     }
 
     // 6. Create Users: Admin, Staff, and Students
@@ -264,36 +268,40 @@ async function seed() {
       });
     }
 
-    // 8. Seed Sample Schedules demonstrating Round-Robin & Holiday Freeze
-    console.log("-> Seeding Round-Robin Schedules for Sep 21 - Sep 27...");
-    const sampleScheduleDates = [
-      { date: "2026-09-21", groupIdx: 0, rotPos: 0 }, // G1
-      { date: "2026-09-22", groupIdx: 1, rotPos: 1 }, // G2
-      { date: "2026-09-23", groupIdx: 2, rotPos: 2 }, // G3
-      { date: "2026-09-24", groupIdx: 3, rotPos: 3 }, // G4
-      // 2026-09-25 is a HOLIDAY! (Freeze: rotation does NOT advance)
-      { date: "2026-09-26", groupIdx: 4, rotPos: 4 }, // G5
-      { date: "2026-09-27", groupIdx: 0, rotPos: 0 }, // G1 (wrap-around)
-    ];
+    // 8. Schedules (Configured dynamically by Admin)
+    if (createdGroups.length > 0) {
+      console.log("-> Seeding Round-Robin Schedules for Sep 21 - Sep 27...");
+      const sampleScheduleDates = [
+        { date: "2026-09-21", groupIdx: 0, rotPos: 0 }, // G1
+        { date: "2026-09-22", groupIdx: 1, rotPos: 1 }, // G2
+        { date: "2026-09-23", groupIdx: 2, rotPos: 2 }, // G3
+        { date: "2026-09-24", groupIdx: 3, rotPos: 3 }, // G4
+        // 2026-09-25 is a HOLIDAY! (Freeze: rotation does NOT advance)
+        { date: "2026-09-26", groupIdx: 4, rotPos: 4 }, // G5
+        { date: "2026-09-27", groupIdx: 0, rotPos: 0 }, // G1 (wrap-around)
+      ];
 
-    for (const item of sampleScheduleDates) {
-      const existing = await db
-        .select()
-        .from(schedules)
-        .where(eq(schedules.scheduleDate, item.date))
-        .limit(1);
+      for (const item of sampleScheduleDates) {
+        const existing = await db
+          .select()
+          .from(schedules)
+          .where(eq(schedules.scheduleDate, item.date))
+          .limit(1);
 
-      if (existing.length === 0 && createdGroups[item.groupIdx]) {
-        await db.insert(schedules).values({
-          scheduleDate: item.date,
-          groupId: createdGroups[item.groupIdx].id,
-          startTime: "08:00",
-          endTime: "18:00",
-          status: "scheduled",
-          rotationPosition: item.rotPos,
-          createdBy: admin.id,
-        });
+        if (existing.length === 0 && createdGroups[item.groupIdx]) {
+          await db.insert(schedules).values({
+            scheduleDate: item.date,
+            groupId: createdGroups[item.groupIdx].id,
+            startTime: "08:00",
+            endTime: "18:00",
+            status: "scheduled",
+            rotationPosition: item.rotPos,
+            createdBy: admin.id,
+          });
+        }
       }
+    } else {
+      console.log("-> Schedules are generated by Admin once laundry groups are created.");
     }
 
     console.log("==========================================");

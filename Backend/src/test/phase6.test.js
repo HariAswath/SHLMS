@@ -290,35 +290,18 @@ describe("Phase 6: Feedback Module", async () => {
     student1Token = createToken(s1);
     student2Token = createToken(s2);
 
-    // Find or create a delivered laundry record for student1
-    let [rec] = await db
-      .select()
-      .from(laundryRecords)
-      .where(eq(laundryRecords.studentId, s1.id))
-      .limit(1);
-
-    if (!rec) {
-      [rec] = await db
-        .insert(laundryRecords)
-        .values({
-          studentId: s1.id,
-          status: "delivered",
-          clothDetails: { shirts: 2 },
-          deliveredAt: new Date(),
-        })
-        .returning();
-    } else if (rec.status !== "delivered") {
-      [rec] = await db
-        .update(laundryRecords)
-        .set({ status: "delivered", deliveredAt: new Date() })
-        .where(eq(laundryRecords.id, rec.id))
-        .returning();
-    }
+    // Create a fresh delivered laundry record for student1
+    const [rec] = await db
+      .insert(laundryRecords)
+      .values({
+        studentId: s1.id,
+        status: "delivered",
+        clothDetails: { shirts: 2 },
+        deliveredAt: new Date(),
+      })
+      .returning();
 
     deliveredLaundryRecord = rec;
-
-    // Clean any prior feedback for this laundry record to keep test idempotent
-    await db.delete(feedback).where(eq(feedback.laundryId, deliveredLaundryRecord.id));
   });
 
   it("should forbid staff or admin from submitting student feedback (403)", async () => {

@@ -48,6 +48,11 @@ export const createLaundryGroup = async (req, res, next) => {
       );
     }
 
+    const finalEnd =
+      roomRangeEnd && roomRangeEnd.trim()
+        ? roomRangeEnd.trim()
+        : roomRangeStart.trim();
+
     const [newGroup] = await db
       .insert(laundryGroups)
       .values({
@@ -55,7 +60,7 @@ export const createLaundryGroup = async (req, res, next) => {
         name: name.trim(),
         groupOrder,
         roomRangeStart: roomRangeStart.trim(),
-        roomRangeEnd: roomRangeEnd.trim(),
+        roomRangeEnd: finalEnd,
         status,
       })
       .returning();
@@ -242,6 +247,61 @@ export const resolveGroup = async (req, res, next) => {
       success: true,
       message: "Laundry group resolved successfully",
       data: { group: resolved },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==========================================
+// 6. Delete Laundry Group (Admin Only)
+// ==========================================
+export const deleteLaundryGroup = async (req, res, next) => {
+  try {
+    const groupId = parseInt(req.params.id, 10);
+    if (isNaN(groupId)) {
+      throw new AppError("Invalid laundry group ID parameter", 400);
+    }
+
+    const existingGroup = await db.query.laundryGroups.findFirst({
+      where: eq(laundryGroups.id, groupId),
+    });
+
+    if (!existingGroup) {
+      throw new AppError("Laundry group not found", 404);
+    }
+
+    await db.delete(laundryGroups).where(eq(laundryGroups.id, groupId));
+
+    return res.status(200).json({
+      success: true,
+      message: `Laundry group '${existingGroup.name}' deleted successfully`,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==========================================
+// 7. Delete All Laundry Groups (Admin Only)
+// ==========================================
+export const deleteAllLaundryGroups = async (req, res, next) => {
+  try {
+    const { hostelId } = req.query;
+    let deleted;
+    if (hostelId) {
+      deleted = await db
+        .delete(laundryGroups)
+        .where(eq(laundryGroups.hostelId, parseInt(hostelId, 10)))
+        .returning();
+    } else {
+      deleted = await db.delete(laundryGroups).returning();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully deleted ${deleted.length} laundry group(s)`,
+      data: { count: deleted.length },
     });
   } catch (error) {
     next(error);

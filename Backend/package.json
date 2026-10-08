@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test src/test/**/*.test.js",
+    "pretest": "node src/test/pretest.js",
+    "test": "node --test --test-concurrency=1 src/test/**/*.test.js",
+    "posttest": "node src/test/posttest.js",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:seed": "node src/db/seed.js"

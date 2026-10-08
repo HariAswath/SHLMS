@@ -1,8 +1,11 @@
 process.env.NODE_ENV = "test";
-import { describe, it } from "node:test";
+import { describe, it, before } from "node:test";
 import assert from "node:assert/strict";
 import { env } from "../config/env.js";
 import { resolveGroupByRoom } from "../utils/groupResolver.js";
+import { db } from "../db/db.js";
+import { laundryGroups } from "../db/schema.js";
+import { eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import app from "../app.js";
 
@@ -49,6 +52,50 @@ const createToken = (user) => {
 };
 
 describe("Phase 3: Room-to-Group Resolver", () => {
+  before(async () => {
+    const existing1 = await db.select().from(laundryGroups).where(eq(laundryGroups.groupOrder, 1)).limit(1);
+    if (existing1.length === 0) {
+      await db.insert(laundryGroups).values({
+        hostelId: 1,
+        name: "Group 1",
+        groupOrder: 1,
+        roomRangeStart: "101",
+        roomRangeEnd: "103",
+        status: "active",
+      });
+    } else {
+      await db
+        .update(laundryGroups)
+        .set({
+          name: "Group 1",
+          roomRangeStart: "101",
+          roomRangeEnd: "103",
+        })
+        .where(eq(laundryGroups.id, existing1[0].id));
+    }
+
+    const existing2 = await db.select().from(laundryGroups).where(eq(laundryGroups.groupOrder, 2)).limit(1);
+    if (existing2.length === 0) {
+      await db.insert(laundryGroups).values({
+        hostelId: 1,
+        name: "Group 2",
+        groupOrder: 2,
+        roomRangeStart: "104",
+        roomRangeEnd: "106",
+        status: "active",
+      });
+    } else {
+      await db
+        .update(laundryGroups)
+        .set({
+          name: "Group 2",
+          roomRangeStart: "104",
+          roomRangeEnd: "106",
+        })
+        .where(eq(laundryGroups.id, existing2[0].id));
+    }
+  });
+
   it("should resolve seeded rooms to their correct laundry groups", async () => {
     // In seed: Hostel 1 has G1 (101-103), G2 (104-106), G3 (107-109)
     const g1 = await resolveGroupByRoom(1, "102");

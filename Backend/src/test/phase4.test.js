@@ -245,4 +245,45 @@ describe("Phase 4: Round-Robin Schedule Generation & Holiday Freeze", () => {
     assert.equal(res.body.data.schedule.startTime, "09:00");
     assert.equal(res.body.data.schedule.endTime, "17:00");
   });
+
+  it("should remove holiday from student upcoming schedules and shift next laundry day", async () => {
+    // 1. Check student schedule before announcing holiday
+    const beforeRes = await makeRequest("GET", "/api/v1/schedules/my", {
+      headers: { Authorization: `Bearer ${studentToken}` },
+    });
+    assert.equal(beforeRes.status, 200);
+
+    const studentUpcoming = beforeRes.body.data.upcomingSchedules;
+    if (studentUpcoming && studentUpcoming.length > 0) {
+      const targetHolidayDate = studentUpcoming[0].scheduleDate;
+
+      // 2. Announce holiday on that exact laundry day
+      const holRes = await makeRequest("POST", "/api/v1/schedules/holidays", {
+        headers: { Authorization: `Bearer ${adminToken}` },
+        body: { date: targetHolidayDate, reason: "Special Maintenance Day" },
+      });
+      assert.equal(holRes.status, 201);
+
+      // 3. Re-query student schedule
+      const afterRes = await makeRequest("GET", "/api/v1/schedules/my", {
+        headers: { Authorization: `Bearer ${studentToken}` },
+      });
+      assert.equal(afterRes.status, 200);
+
+      // Verify the holiday date is REMOVED from student's upcoming laundry schedules
+      const dates = afterRes.body.data.upcomingSchedules.map((s) => s.scheduleDate);
+      assert.equal(
+        dates.includes(targetHolidayDate),
+        false,
+        "Holiday date must be removed from student's upcoming laundry schedules"
+      );
+
+      // Next schedule date must NOT be the holiday date
+      assert.notEqual(
+        afterRes.body.data.nextScheduleDate,
+        targetHolidayDate,
+        "Next laundry day must not be on an announced holiday"
+      );
+    }
+  });
 });

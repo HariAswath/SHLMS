@@ -15,6 +15,7 @@ export const createUserSchema = {
       hostelId: z.number().int().positive().optional(),
       floorId: z.number().int().positive().optional(),
       roomId: z.number().int().positive().optional(),
+      roomNumber: z.union([z.string(), z.number()]).optional(),
       barcodeValue: z.string().optional(),
       status: z.enum(["active", "inactive"]).optional().default("active"),
     })
@@ -47,6 +48,7 @@ export const updateUserSchema = {
     hostelId: z.number().int().positive().nullable().optional(),
     floorId: z.number().int().positive().nullable().optional(),
     roomId: z.number().int().positive().nullable().optional(),
+    roomNumber: z.union([z.string(), z.number()]).optional(),
     barcodeValue: z.string().optional(),
   }),
 };

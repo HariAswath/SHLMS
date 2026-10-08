@@ -106,9 +106,92 @@ function NewUserModal({ isOpen, onClose, onSuccess }) {
   );
 }
 
+function EditUserModal({ user, isOpen, onClose, onSuccess }) {
+  const [name, setName] = useState(user?.name || "");
+  const [email, setEmail] = useState(user?.email || "");
+  const [roomNumber, setRoomNumber] = useState(user?.room?.roomNumber || "");
+  const [studentId, setStudentId] = useState(user?.studentId || "");
+  const [employeeId, setEmployeeId] = useState(user?.employeeId || "");
+  const [busy, setBusy] = useState(false);
+
+  if (!isOpen || !user) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const payload = {
+        name: name.trim(),
+        email: email.trim(),
+        ...(user.role === "student"
+          ? {
+              studentId: studentId.trim(),
+              roomNumber: roomNumber.trim() ? roomNumber.trim() : undefined,
+            }
+          : {
+              employeeId: employeeId.trim() || undefined,
+            }),
+      };
+      await patch(`/users/${user.id}`, payload);
+      toast(`User ${name} updated successfully.`);
+      if (onSuccess) onSuccess();
+      onClose();
+    } catch (err) {
+      toast(err.message, "danger");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+      <Card className="w-full max-w-md p-6 animate-[modalIn_150ms_ease-out]">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">Edit User & Room</h3>
+            <p className="text-xs text-slate-500">Update credentials and hostel assignment</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <Field label="Full Name">
+            <Input required value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+
+          <Field label="Email Address">
+            <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          </Field>
+
+          {user.role === "student" ? (
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Student ID">
+                <Input required value={studentId} onChange={(e) => setStudentId(e.target.value)} />
+              </Field>
+              <Field label="Room Number">
+                <Input value={roomNumber} onChange={(e) => setRoomNumber(e.target.value)} placeholder="e.g. 102" />
+              </Field>
+            </div>
+          ) : (
+            <Field label="Employee ID">
+              <Input required value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} />
+            </Field>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
+            <Button type="submit" loading={busy}>Save Changes</Button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  );
+}
+
 export default function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [modalOpen, setModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
   const [busyId, setBusyId] = useState(null);
 
   const { data, error, loading, retry, reload } = useLoad(async () => {
@@ -200,13 +283,16 @@ export default function AdminUsers() {
               case "details":
                 return (
                   <div className="text-xs text-slate-600">
-                    {u.student ? (
+                    {u.role === "student" ? (
                       <>
-                        <p>{u.student.studentId} · Room {u.student.room?.roomNumber || "—"}</p>
-                        <p className="font-mono text-[10px] text-slate-400">{u.student.barcodeValue}</p>
+                        <p className="font-medium text-slate-800">
+                          {u.studentId} · Room {u.room?.roomNumber || "Unassigned"}
+                          {u.hostel?.name ? ` (${u.hostel.name})` : ""}
+                        </p>
+                        <p className="font-mono text-[10px] text-slate-400">{u.barcodeValue}</p>
                       </>
-                    ) : u.staff ? (
-                      <p>Staff ID: {u.staff.employeeId}</p>
+                    ) : u.role === "staff" ? (
+                      <p>Staff ID: {u.employeeId || "—"}</p>
                     ) : "Master Administrator"}
                   </div>
                 );
@@ -215,14 +301,23 @@ export default function AdminUsers() {
               case "action":
                 if (u.role === "admin") return null;
                 return (
-                  <Button
-                    size="sm"
-                    variant={u.status === "active" ? "ghost" : "secondary"}
-                    loading={busyId === u.id}
-                    onClick={() => toggleStatus(u)}
-                  >
-                    {u.status === "active" ? "Deactivate" : "Activate"}
-                  </Button>
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setEditTarget(u)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={u.status === "active" ? "ghost" : "secondary"}
+                      loading={busyId === u.id}
+                      onClick={() => toggleStatus(u)}
+                    >
+                      {u.status === "active" ? "Deactivate" : "Activate"}
+                    </Button>
+                  </div>
                 );
               default: return null;
             }
@@ -233,6 +328,13 @@ export default function AdminUsers() {
       <NewUserModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
+        onSuccess={reload}
+      />
+
+      <EditUserModal
+        user={editTarget}
+        isOpen={Boolean(editTarget)}
+        onClose={() => setEditTarget(null)}
         onSuccess={reload}
       />
     </div>

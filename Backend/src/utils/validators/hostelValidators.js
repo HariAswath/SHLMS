@@ -64,12 +64,13 @@ export const createLaundryGroupSchema = {
       hostelId: z.number().int().positive("Hostel ID is required"),
       name: z.string().min(2, "Group name must be at least 2 characters long"),
       groupOrder: z.number().int().positive("Group order must be a positive integer"),
-      roomRangeStart: z.string().min(1, "roomRangeStart is required"),
-      roomRangeEnd: z.string().min(1, "roomRangeEnd is required"),
+      roomRangeStart: z.string().min(1, "Room number or starting room is required"),
+      roomRangeEnd: z.string().optional(),
       status: z.enum(["active", "inactive"]).optional().default("active"),
     })
     .refine(
       (data) => {
+        if (!data.roomRangeEnd) return true;
         const start = parseInt(data.roomRangeStart, 10);
         const end = parseInt(data.roomRangeEnd, 10);
         if (!isNaN(start) && !isNaN(end)) {

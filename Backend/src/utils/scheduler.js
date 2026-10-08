@@ -82,6 +82,8 @@ export const generateRoundRobinSchedules = async ({
   for (const dateStr of dateList) {
     // If today is a Holiday: freeze rotation (do not advance rotationIndex)
     if (holidaySet.has(dateStr)) {
+      // Remove any schedule allocated on this holiday date so students never see it
+      await db.delete(schedules).where(eq(schedules.scheduleDate, dateStr));
       continue;
     }
 
@@ -157,6 +159,9 @@ export const shiftFutureSchedulesOnHoliday = async (holidayDateStr, adminId) => 
     .where(and(gte(schedules.scheduleDate, holidayDateStr), eq(schedules.status, "scheduled")))
     .orderBy(desc(schedules.scheduleDate))
     .limit(1);
+
+  // 2. Immediately delete any existing schedule on holidayDateStr
+  await db.delete(schedules).where(eq(schedules.scheduleDate, holidayDateStr));
 
   if (futureSchedules.length === 0) {
     return { shifted: false };
