@@ -7,6 +7,7 @@ import {
   getLaundryById,
   updateLaundryStatus,
   verifyPickupAndDeliver,
+  lookupBarcode,
 } from "../controllers/laundryController.js";
 import { authenticateToken, requireRole } from "../middleware/authMiddleware.js";
 import { validate } from "../middleware/validationMiddleware.js";
@@ -25,6 +26,17 @@ router.use(authenticateToken);
 // ==========================================
 // Operational Counter Endpoints (Must be above /:id)
 // ==========================================
+// 0. Unified scanner lookup: decides hand-over vs intake (Staff & Admin)
+router.post(
+  "/lookup",
+  requireRole("staff", "admin"),
+  validate(verifySubmissionSchema),
+  lookupBarcode
+);
+
+// 0. Unified scanner lookup (Staff & Admin)
+router.post("/lookup", requireRole("staff", "admin"), validate(verifySubmissionSchema), lookupBarcode);
+
 // 1. Verify Submission Eligibility via QR scan (Staff & Admin)
 router.post(
   "/verify-submission",

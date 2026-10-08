@@ -295,6 +295,7 @@ export const getTodayQueue = async (req, res, next) => {
       orderBy: [asc(laundryRecords.submittedAt)],
       with: {
         student: {
+          columns: { passwordHash: false },
           with: {
             room: true,
             floor: true,
@@ -394,6 +395,7 @@ export const getLaundryById = async (req, res, next) => {
       where: eq(laundryRecords.id, recordId),
       with: {
         student: {
+          columns: { passwordHash: false },
           with: {
             room: true,
             floor: true,
@@ -636,6 +638,97 @@ export const verifyPickupAndDeliver = async (req, res, next) => {
       message: "Pickup verified successfully! Laundry marked as delivered.",
       data: {
         record: deliveredRecord,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==========================================
+// 8. Unified Scanner Lookup (Staff & Admin)
+// One scan decides the counter action: hand-over (ready laundry) or intake (scheduled today).
+// Read-only: never changes any record.
+// ==========================================
+export const lookupBarcode = async (req, res, next) => {
+  try {
+    const { barcodeValue, date } = req.body;
+    const todayStr = date || new Date().toISOString().split("T")[0];
+
+    const student = await db.query.users.findFirst({
+      where: eq(users.barcodeValue, barcodeValue.trim()),
+      columns: { passwordHash: false },
+      with: { hostel: true, room: true },
+    });
+
+    if (!student || student.role !== "student") {
+      throw new AppError("No student is registered with this QR/barcode", 404);
+    }
+    if (student.status !== "active") {
+      throw new AppError("Student account is inactive. Please contact administration.", 403);
+    }
+
+    const records = await db
+      .select()
+      .from(laundryRecords)
+      .where(eq(laundryRecords.studentId, student.id))
+      .orderBy(desc(laundryRecords.createdAt));
+
+    const pickup = records.find((r) => r.status === "ready_for_pickup") || null;
+    const processing = records.find((r) => r.status === "received") || null;
+
+    // Intake eligibility, expressed as a result instead of an exception.
+    let intake = { eligible: false, reason: "", schedule: null, group: null };
+    const group = student.hostelId && student.room?.roomNumber
+      ? await resolveGroupByRoom(student.hostelId, student.room.roomNumber)
+      : null;
+
+    if (!group) {
+      intake.reason = "Student's room is not assigned to any active laundry group";
+    } else {
+      intake.group = group;
+      const [holiday] = await db.select().from(holidays).where(eq(holidays.date, todayStr)).limit(1);
+      const todaySchedule = await db.query.schedules.findFirst({
+        where: and(eq(schedules.scheduleDate, todayStr), eq(schedules.status, "scheduled")),
+        with: { group: true },
+      });
+      if (holiday) {
+        intake.reason = `Today is a holiday (${holiday.reason}). No laundry collection today.`;
+      } else if (!todaySchedule) {
+        intake.reason = "No laundry service is scheduled for today";
+      } else if (todaySchedule.groupId !== group.id) {
+        intake.reason = `Not scheduled today. Student belongs to '${group.name}', today is '${todaySchedule.group.name}'.`;
+      } else {
+        const dup = records.find((r) => r.scheduleId === todaySchedule.id);
+        if (dup) {
+          intake.reason = "Student has already submitted laundry for today's schedule";
+        } else {
+          intake.eligible = true;
+          intake.schedule = {
+            id: todaySchedule.id,
+            scheduleDate: todaySchedule.scheduleDate,
+            startTime: todaySchedule.startTime,
+            endTime: todaySchedule.endTime,
+          };
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Barcode resolved",
+      data: {
+        student: {
+          id: student.id,
+          name: student.name,
+          studentId: student.studentId,
+          barcodeValue: student.barcodeValue,
+          hostel: student.hostel?.name,
+          room: student.room?.roomNumber,
+        },
+        pickup,
+        processing,
+        intake,
       },
     });
   } catch (error) {
