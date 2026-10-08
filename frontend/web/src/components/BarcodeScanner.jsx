@@ -19,6 +19,17 @@ export function BarcodeScanner({ onScan, busy = false, submitLabel = "Look up", 
 
   useEffect(() => {
     if (!cameraOn) return undefined;
+
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      setCameraError(
+        "Camera access is blocked by your browser because this page is not loaded over HTTPS. Please open https://" +
+          window.location.host +
+          " on your phone, or type the barcode manually below."
+      );
+      setCameraOn(false);
+      return undefined;
+    }
+
     let cancelled = false;
     const scanner = new Html5Qrcode(REGION_ID);
     scannerRef.current = scanner;
@@ -34,11 +45,14 @@ export function BarcodeScanner({ onScan, busy = false, submitLabel = "Look up", 
       )
       .catch((e) => {
         if (cancelled) return;
-        setCameraError(
-          /permission|denied|NotAllowed/i.test(String(e))
-            ? "Camera permission was denied. Type the barcode below instead."
-            : "Could not start the camera on this device. Type the barcode below instead.",
-        );
+        const errStr = String(e);
+        if (/permission|denied|NotAllowed/i.test(errStr)) {
+          setCameraError("Camera permission was denied in your browser settings. Type the barcode below instead.");
+        } else if (/secure|https|insecure/i.test(errStr)) {
+          setCameraError("Camera requires HTTPS. Please open via https://" + window.location.host + ".");
+        } else {
+          setCameraError("Could not start the camera on this device. Type the barcode below instead.");
+        }
         setCameraOn(false);
       });
     return () => {
