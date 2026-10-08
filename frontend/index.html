@@ -1,0 +1,3528 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SHLMS · Smart Hostel Laundry Management System</title>
+<meta name="description" content="Frontend-only prototype for the Smart Hostel Laundry Management System — Student, Laundry Staff and Administrator portals." />
+
+<!-- Fonts + Tailwind + React + icons + charts, all from CDN so this file runs
+     by double-clicking it. Nothing here talks to a server of our own. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js" crossorigin></script>
+<script>
+  /* lucide-react's UMD bundle looks for a lowercase `react` global. */
+  window.react = window.React;
+</script>
+<script src="https://unpkg.com/lucide-react@0.263.1/dist/umd/lucide-react.js" crossorigin></script>
+<script src="https://cdn.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js" crossorigin></script>
+
+<style>
+  html, body, #root { min-height: 100%; }
+  body { margin: 0; background: #f8fafc; font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #boot { display: flex; min-height: 100vh; align-items: center; justify-content: center; color: #64748b; font-size: 14px; }
+</style>
+</head>
+<body>
+<div id="root"><div id="boot">Loading SHLMS…</div></div>
+
+<noscript>
+  <p style="padding:24px;font-family:sans-serif">This prototype needs JavaScript enabled.</p>
+</noscript>
+
+<script>
+  (function () {
+    var missing = [];
+    if (!window.React) missing.push("React");
+    if (!window.ReactDOM) missing.push("ReactDOM");
+    if (!window.LucideReact) missing.push("lucide-react");
+    if (!window.Recharts) missing.push("Recharts");
+    if (!window.Babel) missing.push("Babel");
+    if (missing.length) {
+      document.getElementById("boot").innerHTML =
+        '<div style="max-width:420px;text-align:center;line-height:1.6">' +
+        '<strong style="color:#0f172a">Could not load: ' + missing.join(", ") + '</strong><br>' +
+        'This page pulls React, Tailwind, lucide and Recharts from a CDN, so it needs an internet connection the first time you open it.</div>';
+    }
+  })();
+</script>
+
+<!-- ================================================================
+     SHLMS component source.
+
+     Everything below the prelude is copied verbatim from
+     shlms_frontend.jsx (the part after its `/* @imports-end */` marker).
+     If you edit the .jsx, re-paste that section here to keep the two in sync.
+     ================================================================ -->
+<script type="text/babel" data-presets="react">
+
+      /* ---- UMD globals mapped onto the names the component file imports ---- */
+      const { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } = React;
+      const { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } = Recharts;
+      const __icon = (name) => LucideReact[name] || LucideReact.Circle;
+      const [Activity, AlertCircle, ArrowRight, ArrowUpRight, Ban, BarChart3, Bell, Boxes, Building2, Calendar, CalendarDays, Camera, Check, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Clock, Download, Droplets, FileSpreadsheet, FileText, Filter, Gauge, Hash, History, Inbox, KeyRound, Layers, LayoutGrid, Loader2, LogOut, Mail, MapPin, Menu, MessageSquare, Package, PackageSearch, Percent, Plus, QrCode, RefreshCw, ScanLine, Search, Send, ShieldCheck, Shirt, Sparkles, Star, ThumbsUp, Timer, Trash2, Truck, Upload, UserPlus, Users, Wind, X, XCircle] =
+        ["Activity","AlertCircle","ArrowRight","ArrowUpRight","Ban","BarChart3","Bell","Boxes","Building2","Calendar","CalendarDays","Camera","Check","CheckCircle2","ChevronDown","ChevronRight","ClipboardList","Clock","Download","Droplets","FileSpreadsheet","FileText","Filter","Gauge","Hash","History","Inbox","KeyRound","Layers","LayoutGrid","Loader2","LogOut","Mail","MapPin","Menu","MessageSquare","Package","PackageSearch","Percent","Plus","QrCode","RefreshCw","ScanLine","Search","Send","ShieldCheck","Shirt","Sparkles","Star","ThumbsUp","Timer","Trash2","Truck","Upload","UserPlus","Users","Wind","X","XCircle"].map(__icon);
+
+
+
+/* ------------------------------------------------------------------ */
+/*  1. Domain constants                                                */
+/* ------------------------------------------------------------------ */
+
+const STATUS_STEPS = [
+  "Scheduled", "Received", "Washing", "Drying", "Ready for Pickup", "Delivered",
+];
+
+const STEP_ICONS = {
+  Scheduled: CalendarDays,
+  Received: Inbox,
+  Washing: Droplets,
+  Drying: Wind,
+  "Ready for Pickup": Package,
+  Delivered: Truck,
+};
+
+const BLOCKS = ["Block A", "Block B", "Block C", "Block D", "Mega Block"];
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const COMPLAINT_CATEGORIES = ["Missing item", "Damaged item", "Wrong delivery", "Delay"];
+const LF_CATEGORIES = ["Clothing", "Bedding", "Accessory", "Footwear", "Other"];
+const GARMENTS = [
+  { key: "shirts", label: "Shirts / T-shirts", weight: 0.22 },
+  { key: "trousers", label: "Trousers / Jeans", weight: 0.5 },
+  { key: "innerwear", label: "Innerwear", weight: 0.08 },
+  { key: "towels", label: "Towels", weight: 0.35 },
+  { key: "bedsheets", label: "Bedsheets", weight: 0.8 },
+];
+
+/* The signed-in student for this prototype (stands in for the auth session). */
+const ME = {
+  name: "Arjun Mehta",
+  regNo: "23BCE1187",
+  block: "Block C",
+  room: "C-214",
+  email: "arjun.mehta2023@vitstudent.ac.in",
+};
+
+/* ------------------------------------------------------------------ */
+/*  2. Helpers                                                         */
+/* ------------------------------------------------------------------ */
+
+let seq = 4000;
+const uid = (prefix) => `${prefix}-${++seq}`;
+
+const pad = (n) => String(n).padStart(2, "0");
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Short human stamp used across tables and timelines, e.g. "30 Aug, 14:05". */
+function stamp(d = new Date()) {
+  return `${pad(d.getDate())} ${MONTHS[d.getMonth()]}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+const dayOf = (s) => (s ? s.split(",")[0] : "—");
+
+const randomOtp = () => String(Math.floor(100000 + Math.random() * 900000));
+
+const countItems = (items) => Object.values(items || {}).reduce((a, b) => a + (Number(b) || 0), 0);
+
+const weighItems = (items) =>
+  Number(GARMENTS.reduce((t, g) => t + (Number(items?.[g.key]) || 0) * g.weight, 0).toFixed(2));
+
+const classNames = (...xs) => xs.filter(Boolean).join(" ");
+
+/** Trigger a real browser download for the generated report blobs. */
+function downloadBlob(filename, mime, content) {
+  try {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+const csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+const buildCsv = (rows) => rows.map((r) => r.map(csvCell).join(",")).join("\r\n");
+
+/** Minimal single-page PDF writer — enough for a text report, no library. */
+function buildPdf(title, lines) {
+  const esc = (s) => String(s).replace(/([\()])/g, "\$1").replace(/[^\x20-\x7E]/g, "?");
+  let content = "BT\n/F1 16 Tf\n56 786 Td\n" + `(${esc(title)}) Tj\n` + "ET\n";
+  content += "0.88 0.89 0.91 RG\n1 w\n56 776 m 539 776 l S\n";
+  let y = 752;
+  content += "BT\n/F2 10 Tf\n";
+  let first = true;
+  for (const line of lines.slice(0, 60)) {
+    if (y < 56) break;
+    content += first ? `56 ${y} Td\n` : `0 -16 Td\n`;
+    content += `(${esc(line)}) Tj\n`;
+    first = false;
+    y -= 16;
+  }
+  content += "ET\n";
+
+  const objs = [
+    "<</Type/Catalog/Pages 2 0 R>>",
+    "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+    "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 5 0 R/F2 6 0 R>>>>/Contents 4 0 R>>",
+    `<</Length ${content.length}>>\nstream\n${content}endstream`,
+    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold>>",
+    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+  ];
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [];
+  objs.forEach((body, i) => {
+    offsets.push(pdf.length);
+    pdf += `${i + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+  offsets.forEach((o) => { pdf += `${String(o).padStart(10, "0")} 00000 n \n`; });
+  pdf += `trailer\n<</Size ${objs.length + 1}/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF`;
+  return pdf;
+}
+
+/* ------------------------------------------------------------------ */
+/*  3. Seed data — stands in for the ER model in the project SRS       */
+/* ------------------------------------------------------------------ */
+
+const rec = (o) => ({
+  remarks: "",
+  otp: null,
+  ...o,
+  itemCount: countItems(o.items),
+  weightKg: o.weightKg ?? weighItems(o.items),
+});
+
+const SEED_RECORDS = [
+  rec({
+    id: "LR-1042", regNo: ME.regNo, student: ME.name, block: ME.block, room: ME.room,
+    items: { shirts: 4, trousers: 2, innerwear: 2, towels: 1, bedsheets: 0 },
+    status: "Washing", staff: "Ravi Kumar", submittedAt: "28 Aug, 09:10",
+    timeline: { Scheduled: "27 Aug, 18:00", Received: "28 Aug, 09:10", Washing: "28 Aug, 11:25" },
+    remarks: "One white shirt — wash separately.",
+  }),
+  rec({
+    id: "LR-1031", regNo: ME.regNo, student: ME.name, block: ME.block, room: ME.room,
+    items: { shirts: 3, trousers: 2, innerwear: 2, towels: 0, bedsheets: 0 },
+    status: "Delivered", staff: "Suresh N.", submittedAt: "21 Aug, 09:02", deliveredAt: "23 Aug, 17:40",
+    otp: "418293",
+    timeline: {
+      Scheduled: "20 Aug, 18:00", Received: "21 Aug, 09:02", Washing: "21 Aug, 10:40",
+      Drying: "21 Aug, 15:10", "Ready for Pickup": "22 Aug, 09:30", Delivered: "23 Aug, 17:40",
+    },
+  }),
+  rec({
+    id: "LR-1019", regNo: ME.regNo, student: ME.name, block: ME.block, room: ME.room,
+    items: { shirts: 5, trousers: 3, innerwear: 2, towels: 1, bedsheets: 0 },
+    status: "Delivered", staff: "Ravi Kumar", submittedAt: "14 Aug, 08:55", deliveredAt: "16 Aug, 18:05",
+    otp: "770145",
+    timeline: {
+      Scheduled: "13 Aug, 18:00", Received: "14 Aug, 08:55", Washing: "14 Aug, 10:15",
+      Drying: "14 Aug, 14:50", "Ready for Pickup": "15 Aug, 09:20", Delivered: "16 Aug, 18:05",
+    },
+  }),
+  rec({
+    id: "LR-1006", regNo: ME.regNo, student: ME.name, block: ME.block, room: ME.room,
+    items: { shirts: 3, trousers: 2, innerwear: 2, towels: 1, bedsheets: 0 },
+    status: "Delivered", staff: "Suresh N.", submittedAt: "07 Aug, 09:20", deliveredAt: "09 Aug, 16:30",
+    otp: "553108",
+    timeline: {
+      Scheduled: "06 Aug, 18:00", Received: "07 Aug, 09:20", Washing: "07 Aug, 11:00",
+      Drying: "07 Aug, 15:35", "Ready for Pickup": "08 Aug, 10:10", Delivered: "09 Aug, 16:30",
+    },
+  }),
+  rec({
+    id: "LR-1050", regNo: "23BCE1104", student: "Priya Sharma", block: "Block A", room: "A-108",
+    items: {}, status: "Scheduled", staff: "—", submittedAt: "—",
+    timeline: { Scheduled: "29 Aug, 18:00" },
+  }),
+  rec({
+    id: "LR-1049", regNo: "23BCE1220", student: "Karthik R.", block: "Block B", room: "B-302",
+    items: { shirts: 3, trousers: 1, innerwear: 2, towels: 0, bedsheets: 0 },
+    status: "Washing", staff: "Ravi Kumar", submittedAt: "30 Aug, 08:40",
+    timeline: { Scheduled: "29 Aug, 18:00", Received: "30 Aug, 08:40", Washing: "30 Aug, 10:05" },
+  }),
+  rec({
+    id: "LR-1048", regNo: "23BCE1163", student: "Divya S.", block: "Block A", room: "A-215",
+    items: { shirts: 4, trousers: 2, innerwear: 3, towels: 1, bedsheets: 0 },
+    status: "Ready for Pickup", staff: "Suresh N.", submittedAt: "29 Aug, 09:05", otp: "204877",
+    timeline: {
+      Scheduled: "28 Aug, 18:00", Received: "29 Aug, 09:05", Washing: "29 Aug, 10:30",
+      Drying: "29 Aug, 14:20", "Ready for Pickup": "30 Aug, 09:15",
+    },
+  }),
+  rec({
+    id: "LR-1047", regNo: "23BCE1298", student: "Nikhil V.", block: "Block C", room: "C-119",
+    items: { shirts: 3, trousers: 2, innerwear: 2, towels: 1, bedsheets: 0 },
+    status: "Drying", staff: "Ravi Kumar", submittedAt: "29 Aug, 09:40",
+    timeline: {
+      Scheduled: "28 Aug, 18:00", Received: "29 Aug, 09:40", Washing: "29 Aug, 11:15",
+      Drying: "30 Aug, 08:20",
+    },
+  }),
+];
+
+const SEED_COMPLAINTS = [
+  {
+    id: "CMP-201", recordId: "LR-1019", regNo: ME.regNo, student: ME.name,
+    category: "Missing item", subject: "Missing one t-shirt",
+    description: "Submitted 5 shirts but received 4. The missing one is navy blue with a white collar.",
+    photo: null, status: "Under Review", createdAt: "15 Aug, 19:12", handler: "Ravi Kumar", resolution: "",
+  },
+  {
+    id: "CMP-188", recordId: "LR-1006", regNo: ME.regNo, student: ME.name,
+    category: "Delay", subject: "Delivery two days late",
+    description: "Laundry was marked ready on 08 Aug but only handed over on the evening of 09 Aug.",
+    photo: null, status: "Resolved", createdAt: "08 Aug, 20:40", handler: "Suresh N.",
+    resolution: "Delay caused by dryer maintenance. Block C slot moved two hours earlier from the next cycle.",
+    resolvedAt: "10 Aug, 11:00",
+  },
+  {
+    id: "CMP-195", recordId: "LR-1049", regNo: "23BCE1220", student: "Karthik R.",
+    category: "Damaged item", subject: "Torn sleeve on kurta",
+    description: "The right sleeve seam has opened up after the wash cycle.",
+    photo: null, status: "Open", createdAt: "30 Aug, 08:05", handler: "Ravi Kumar", resolution: "",
+  },
+];
+
+const SEED_LOST = [
+  {
+    id: "LF-77", description: "Grey hoodie, no name tag, size M", category: "Clothing", color: "Grey",
+    foundAt: "26 Aug", foundPlace: "Drying yard — line 3", photo: null, status: "Available",
+    uploadedBy: "Ravi Kumar", claim: null,
+  },
+  {
+    id: "LF-74", description: "Blue single bedsheet with floral print", category: "Bedding", color: "Blue",
+    foundAt: "24 Aug", foundPlace: "Sorting table", photo: null, status: "Claim Pending",
+    uploadedBy: "Suresh N.",
+    claim: {
+      by: "Divya S.", regNo: "23BCE1163", at: "28 Aug, 17:22",
+      proof: "Small ink stain near the bottom-right corner, and a stitched initial D on the hem.",
+    },
+  },
+  {
+    id: "LF-69", description: "Black socks (pair), ribbed cuff", category: "Clothing", color: "Black",
+    foundAt: "20 Aug", foundPlace: "Washer 4 drum", photo: null, status: "Returned",
+    uploadedBy: "Ravi Kumar",
+    claim: { by: "Nikhil V.", regNo: "23BCE1298", proof: "Small hole on the left toe.", at: "21 Aug, 10:00" },
+  },
+];
+
+const SEED_USERS = [
+  { id: "U-01", name: ME.name, role: "Student", identifier: ME.regNo, block: ME.block, detail: ME.room, email: ME.email, status: "Active" },
+  { id: "U-02", name: "Priya Sharma", role: "Student", identifier: "23BCE1104", block: "Block A", detail: "A-108", email: "priya.sharma2023@hostel.edu", status: "Active" },
+  { id: "U-03", name: "Karthik R.", role: "Student", identifier: "23BCE1220", block: "Block B", detail: "B-302", email: "karthik.r2023@hostel.edu", status: "Active" },
+  { id: "U-04", name: "Divya S.", role: "Student", identifier: "23BCE1163", block: "Block A", detail: "A-215", email: "divya.s2023@hostel.edu", status: "Active" },
+  { id: "U-05", name: "Nikhil V.", role: "Student", identifier: "23BCE1298", block: "Block C", detail: "C-119", email: "nikhil.v2023@hostel.edu", status: "Suspended" },
+  { id: "U-06", name: "Ravi Kumar", role: "Staff", identifier: "STF-114", block: "Block C", detail: "Morning shift", email: "ravi.kumar@hostelops.in", status: "Active" },
+  { id: "U-07", name: "Suresh N.", role: "Staff", identifier: "STF-108", block: "Block A", detail: "Evening shift", email: "suresh.n@hostelops.in", status: "Active" },
+];
+
+const SEED_SCHEDULE = {
+  "Block A": "Mon", "Block B": "Tue", "Block C": "Wed", "Block D": "Thu", "Mega Block": "Fri",
+};
+
+const SEED_BLACKOUTS = [
+  { id: "BO-1", date: "15 Sep", reason: "Boiler servicing — no wash cycles" },
+  { id: "BO-2", date: "02 Oct", reason: "Public holiday — skeleton staff only" },
+];
+
+const SEED_FEEDBACK = [
+  { id: "FB-11", recordId: "LR-1031", regNo: ME.regNo, student: ME.name, overall: 4, cleanliness: 4, speed: 3, care: 5, note: "Clean wash, but the pickup queue was slow.", at: "23 Aug, 19:00" },
+  { id: "FB-09", recordId: "LR-1019", regNo: ME.regNo, student: ME.name, overall: 5, cleanliness: 5, speed: 5, care: 5, note: "Delivered a day early. Nothing to report.", at: "16 Aug, 20:15" },
+];
+
+const SEED_NOTIFICATIONS = [
+  { id: "N-9", audience: "admin", text: "New complaint CMP-195 raised by Karthik R.", at: "30 Aug, 08:05", read: false },
+  { id: "N-8", audience: "admin", text: "Claim pending verification for item LF-74.", at: "28 Aug, 17:22", read: false },
+  { id: "N-6", audience: "staff", text: "LR-1048 is awaiting OTP handover.", at: "30 Aug, 09:15", read: false },
+  { id: "N-5", audience: "staff", text: "Today's queue assigned — 4 students across Block A and C.", at: "30 Aug, 07:30", read: false },
+  { id: "N-3", audience: "student", text: "Laundry LR-1042 moved to Washing.", at: "28 Aug, 11:25", read: false },
+  { id: "N-2", audience: "student", text: "Complaint CMP-201 is under review.", at: "16 Aug, 09:00", read: false },
+  { id: "N-1", audience: "student", text: "Reminder — rate your delivery for LR-1031.", at: "23 Aug, 18:00", read: true },
+];
+
+const WEEKLY_LOAD = [
+  { day: "Mon", items: 62, complaints: 2 }, { day: "Tue", items: 78, complaints: 1 },
+  { day: "Wed", items: 55, complaints: 0 }, { day: "Thu", items: 91, complaints: 3 },
+  { day: "Fri", items: 70, complaints: 1 }, { day: "Sat", items: 40, complaints: 0 },
+  { day: "Sun", items: 18, complaints: 0 },
+];
+
+const BLOCK_VOLUME = [
+  { block: "Block A", items: 128 }, { block: "Block B", items: 96 },
+  { block: "Block C", items: 141 }, { block: "Block D", items: 74 },
+  { block: "Mega Block", items: 163 },
+];
+
+/* ------------------------------------------------------------------ */
+/*  4. Store — one reactive state tree shared by all three portals     */
+/* ------------------------------------------------------------------ */
+
+const StoreContext = createContext(null);
+const useStore = () => useContext(StoreContext);
+
+function StoreProvider({ children }) {
+  const [records, setRecords] = useState(SEED_RECORDS);
+  const [complaints, setComplaints] = useState(SEED_COMPLAINTS);
+  const [lostItems, setLostItems] = useState(SEED_LOST);
+  const [users, setUsers] = useState(SEED_USERS);
+  const [schedule, setSchedule] = useState(SEED_SCHEDULE);
+  const [blackouts, setBlackouts] = useState(SEED_BLACKOUTS);
+  const [feedback, setFeedback] = useState(SEED_FEEDBACK);
+  const [notifications, setNotifications] = useState(SEED_NOTIFICATIONS);
+  const [toasts, setToasts] = useState([]);
+
+  const toast = useCallback((text, tone = "success") => {
+    const id = uid("T");
+    setToasts((t) => [...t, { id, text, tone }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
+  }, []);
+
+  const dismissToast = useCallback((id) => setToasts((t) => t.filter((x) => x.id !== id)), []);
+
+  const notify = useCallback((audience, text) => {
+    setNotifications((n) => [{ id: uid("N"), audience, text, at: stamp(), read: false }, ...n]);
+  }, []);
+
+  const markAllRead = useCallback((audience) => {
+    setNotifications((n) => n.map((x) => (x.audience === audience ? { ...x, read: true } : x)));
+  }, []);
+
+  /* --- laundry lifecycle ------------------------------------------ */
+
+  const submitLaundry = useCallback((payload) => {
+    const id = uid("LR");
+    const at = stamp();
+    const record = rec({
+      id,
+      regNo: payload.regNo,
+      student: payload.student,
+      block: payload.block,
+      room: payload.room,
+      items: payload.items,
+      remarks: payload.remarks,
+      status: "Received",
+      staff: payload.staff,
+      submittedAt: at,
+      timeline: { Scheduled: at, Received: at },
+    });
+    setRecords((r) => [record, ...r]);
+    notify("student", `Laundry ${id} received at the counter — ${record.itemCount} items logged.`);
+    notify("admin", `${payload.student} submitted ${record.itemCount} items (${id}).`);
+    toast(`${id} submitted — ${record.itemCount} items, ${record.weightKg} kg`);
+    return record;
+  }, [notify, toast]);
+
+  const advanceRecord = useCallback((id) => {
+    let message = "";
+    setRecords((rs) => rs.map((r) => {
+      if (r.id !== id) return r;
+      const next = STATUS_STEPS[STATUS_STEPS.indexOf(r.status) + 1];
+      if (!next || next === "Delivered") return r; // delivery only happens through OTP
+      const at = stamp();
+      message = `${id} moved to ${next}.`;
+      return {
+        ...r,
+        status: next,
+        otp: next === "Ready for Pickup" ? r.otp || randomOtp() : r.otp,
+        timeline: { ...r.timeline, [next]: at },
+      };
+    }));
+    if (message) {
+      notify("student", message);
+      toast(message);
+    }
+  }, [notify, toast]);
+
+  const verifyOtp = useCallback((id, code) => {
+    const record = records.find((r) => r.id === id);
+    if (!record) return { ok: false, reason: "No such laundry record." };
+    if (record.status !== "Ready for Pickup") {
+      return { ok: false, reason: `${id} is ${record.status} — not yet ready for handover.` };
+    }
+    if (code !== record.otp) return { ok: false, reason: "Incorrect OTP. Ask the student to re-read the code." };
+    const at = stamp();
+    setRecords((rs) => rs.map((r) => (
+      r.id === id ? { ...r, status: "Delivered", deliveredAt: at, timeline: { ...r.timeline, Delivered: at } } : r
+    )));
+    notify("student", `${id} handed over. Pickup confirmation email sent.`);
+    notify("admin", `${id} delivered to ${record.student}.`);
+    toast(`${id} delivered — confirmation email sent to ${record.student}`);
+    return { ok: true, record };
+  }, [records, notify, toast]);
+
+  /* --- complaints -------------------------------------------------- */
+
+  const raiseComplaint = useCallback((payload) => {
+    const id = uid("CMP");
+    const complaint = {
+      id,
+      recordId: payload.recordId,
+      regNo: ME.regNo,
+      student: ME.name,
+      category: payload.category,
+      subject: payload.subject,
+      description: payload.description,
+      photo: payload.photo || null,
+      status: "Open",
+      createdAt: stamp(),
+      handler: records.find((r) => r.id === payload.recordId)?.staff || "—",
+      resolution: "",
+    };
+    setComplaints((c) => [complaint, ...c]);
+    notify("admin", `New complaint ${id} — ${payload.category} on ${payload.recordId}.`);
+    toast(`Complaint ${id} submitted for review`);
+    return complaint;
+  }, [records, notify, toast]);
+
+  const updateComplaintStatus = useCallback((id, status) => {
+    setComplaints((c) => c.map((x) => (x.id === id ? { ...x, status } : x)));
+    toast(`${id} marked ${status}`, "info");
+  }, [toast]);
+
+  const resolveComplaint = useCallback((id, resolution) => {
+    setComplaints((c) => c.map((x) => (
+      x.id === id ? { ...x, status: "Resolved", resolution, resolvedAt: stamp() } : x
+    )));
+    notify("student", `Complaint ${id} has been resolved.`);
+    toast(`${id} resolved — student notified`);
+  }, [notify, toast]);
+
+  /* --- lost & found ------------------------------------------------ */
+
+  const addLostItem = useCallback((payload) => {
+    const id = uid("LF");
+    setLostItems((l) => [{ ...payload, id, status: "Available", claim: null }, ...l]);
+    notify("student", `New unclaimed item listed in Lost & Found (${id}).`);
+    toast(`Lost item ${id} published to the board`);
+  }, [notify, toast]);
+
+  const claimLostItem = useCallback((id, proof) => {
+    setLostItems((l) => l.map((x) => (
+      x.id === id
+        ? { ...x, status: "Claim Pending", claim: { by: ME.name, regNo: ME.regNo, proof, at: stamp() } }
+        : x
+    )));
+    notify("admin", `Claim submitted for ${id} by ${ME.name} — awaiting verification.`);
+    toast(`Claim for ${id} sent to the hostel office`);
+  }, [notify, toast]);
+
+  const settleClaim = useCallback((id, approve) => {
+    setLostItems((l) => l.map((x) => (
+      x.id === id ? { ...x, status: approve ? "Returned" : "Available", claim: approve ? x.claim : null } : x
+    )));
+    notify("student", approve
+      ? `Your claim for ${id} was approved — collect it from the laundry desk.`
+      : `Your claim for ${id} could not be verified. The item is back on the board.`);
+    toast(approve ? `${id} released to claimant` : `Claim on ${id} rejected`, approve ? "success" : "danger");
+  }, [notify, toast]);
+
+  /* --- users, schedule, feedback ------------------------------------ */
+
+  const addUser = useCallback((user) => {
+    setUsers((u) => [{ ...user, id: uid("U"), status: "Active" }, ...u]);
+    toast(`${user.name} added as ${user.role}`);
+  }, [toast]);
+
+  const toggleUser = useCallback((id) => {
+    setUsers((us) => us.map((u) => (
+      u.id === id ? { ...u, status: u.status === "Active" ? "Suspended" : "Active" } : u
+    )));
+  }, []);
+
+  const removeUser = useCallback((id) => {
+    setUsers((us) => us.filter((u) => u.id !== id));
+    toast("Account removed", "danger");
+  }, [toast]);
+
+  const reassignBlock = useCallback((block, day) => {
+    setSchedule((s) => ({ ...s, [block]: day }));
+    notify("student", `${block} laundry day moved to ${day}.`);
+    notify("staff", `${block} is now collected on ${day}.`);
+    toast(`${block} reassigned to ${day}`);
+  }, [notify, toast]);
+
+  const addBlackout = useCallback((date, reason) => {
+    setBlackouts((b) => [...b, { id: uid("BO"), date, reason }]);
+    toast(`Blackout added for ${date}`, "info");
+  }, [toast]);
+
+  const removeBlackout = useCallback((id) => setBlackouts((b) => b.filter((x) => x.id !== id)), []);
+
+  const submitFeedback = useCallback((payload) => {
+    const id = uid("FB");
+    setFeedback((f) => [{ ...payload, id, regNo: ME.regNo, student: ME.name, at: stamp() }, ...f]);
+    notify("admin", `New ${payload.overall}-star rating on ${payload.recordId}.`);
+    toast("Thanks — your rating was recorded");
+  }, [notify, toast]);
+
+  const value = useMemo(() => ({
+    records, complaints, lostItems, users, schedule, blackouts, feedback, notifications, toasts,
+    toast, dismissToast, notify, markAllRead,
+    submitLaundry, advanceRecord, verifyOtp,
+    raiseComplaint, updateComplaintStatus, resolveComplaint,
+    addLostItem, claimLostItem, settleClaim,
+    addUser, toggleUser, removeUser,
+    reassignBlock, addBlackout, removeBlackout, submitFeedback,
+  }), [
+    records, complaints, lostItems, users, schedule, blackouts, feedback, notifications, toasts,
+    toast, dismissToast, notify, markAllRead, submitLaundry, advanceRecord, verifyOtp,
+    raiseComplaint, updateComplaintStatus, resolveComplaint, addLostItem, claimLostItem,
+    settleClaim, addUser, toggleUser, removeUser, reassignBlock, addBlackout, removeBlackout,
+    submitFeedback,
+  ]);
+
+  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
+}
+
+/* ------------------------------------------------------------------ */
+/*  5. UI atoms — the shared Stripe-dashboard vocabulary               */
+/* ------------------------------------------------------------------ */
+
+function Card({ children, className = "", as: Tag = "div", ...rest }) {
+  return (
+    <Tag
+      className={classNames(
+        "rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
+        className,
+      )}
+      {...rest}
+    >
+      {children}
+    </Tag>
+  );
+}
+
+const BUTTON_STYLES = {
+  primary: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm disabled:bg-indigo-300",
+  secondary: "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 disabled:text-slate-300",
+  ghost: "text-slate-600 hover:bg-slate-100 disabled:text-slate-300",
+  danger: "bg-white text-rose-600 border border-rose-200 hover:bg-rose-50",
+  success: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm",
+};
+
+function Button({ children, variant = "primary", size = "md", className = "", ...props }) {
+  const sizes = { sm: "px-2.5 py-1.5 text-xs gap-1.5", md: "px-4 py-2 text-sm gap-2" };
+  return (
+    <button
+      className={classNames(
+        "inline-flex items-center justify-center rounded-lg font-medium transition-colors",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed",
+        sizes[size], BUTTON_STYLES[variant], className,
+      )}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+
+const PILL_STYLES = {
+  Scheduled: "bg-slate-100 text-slate-600",
+  Received: "bg-indigo-50 text-indigo-700",
+  Washing: "bg-indigo-50 text-indigo-700",
+  Drying: "bg-amber-50 text-amber-700",
+  "Ready for Pickup": "bg-emerald-50 text-emerald-700",
+  Delivered: "bg-emerald-100 text-emerald-700",
+  Open: "bg-rose-50 text-rose-700",
+  "Under Review": "bg-amber-50 text-amber-700",
+  Resolved: "bg-emerald-50 text-emerald-700",
+  Available: "bg-indigo-50 text-indigo-700",
+  "Claim Pending": "bg-amber-50 text-amber-700",
+  Returned: "bg-emerald-50 text-emerald-700",
+  Active: "bg-emerald-50 text-emerald-700",
+  Suspended: "bg-rose-50 text-rose-700",
+  Student: "bg-indigo-50 text-indigo-700",
+  Staff: "bg-slate-100 text-slate-600",
+};
+
+function StatusPill({ status, className = "" }) {
+  return (
+    <span
+      className={classNames(
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium",
+        PILL_STYLES[status] || "bg-slate-100 text-slate-600", className,
+      )}
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
+      {status}
+    </span>
+  );
+}
+
+const TINTS = {
+  indigo: "bg-indigo-50 text-indigo-600",
+  emerald: "bg-emerald-50 text-emerald-600",
+  amber: "bg-amber-50 text-amber-600",
+  rose: "bg-rose-50 text-rose-600",
+  slate: "bg-slate-100 text-slate-500",
+};
+
+function StatCard({ label, value, sub, icon: Icon, tint = "indigo", trend }) {
+  return (
+    <Card className="p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm text-slate-500">{label}</p>
+          <p className="mt-1.5 truncate text-2xl font-semibold text-slate-900">{value}</p>
+          {sub && <p className="mt-1 truncate text-xs text-slate-400">{sub}</p>}
+        </div>
+        <div className={classNames("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", TINTS[tint])}>
+          <Icon size={18} />
+        </div>
+      </div>
+      {trend && (
+        <p className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+          <ArrowUpRight size={13} /> {trend}
+        </p>
+      )}
+    </Card>
+  );
+}
+
+function SectionHeader({ title, subtitle, action, className = "" }) {
+  return (
+    <div className={classNames("mb-5 flex flex-wrap items-start justify-between gap-3", className)}>
+      <div>
+        <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+        {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function EmptyState({ icon: Icon = Inbox, title, hint }) {
+  return (
+    <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+        <Icon size={18} />
+      </div>
+      <p className="text-sm font-medium text-slate-700">{title}</p>
+      {hint && <p className="mt-1 max-w-sm text-xs text-slate-400">{hint}</p>}
+    </div>
+  );
+}
+
+/**
+ * Shared table renderer. `columns` is [{ key, label, align }] and `render`
+ * returns the cell body for a given row + column key.
+ */
+function Table({ columns, rows, render, empty = "Nothing here yet.", rowKey = (r, i) => r.id || i }) {
+  if (!rows.length) return <EmptyState title={empty} />;
+  return (
+    <div className="overflow-x-auto rounded-xl border border-slate-200">
+      <table className="w-full min-w-[640px] text-left text-sm">
+        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+          <tr>
+            {columns.map((c) => (
+              <th
+                key={c.key}
+                className={classNames("px-4 py-3 font-medium", c.align === "right" && "text-right")}
+              >
+                {c.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {rows.map((row, i) => (
+            <tr key={rowKey(row, i)} className="transition-colors hover:bg-slate-50/70">
+              {columns.map((c) => (
+                <td
+                  key={c.key}
+                  className={classNames("px-4 py-3 align-middle text-slate-700", c.align === "right" && "text-right")}
+                >
+                  {render(row, c.key)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Modal({ open, onClose, title, subtitle, children, footer, width = "max-w-lg" }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-[2px] sm:p-8">
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+      <div
+        className={classNames(
+          "relative z-10 my-auto w-full animate-[modalIn_140ms_ease-out] rounded-xl border border-slate-200 bg-white shadow-xl",
+          width,
+        )}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+          <div>
+            <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+            {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="px-6 py-5">{children}</div>
+        {footer && (
+          <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50/60 px-6 py-4">
+            {footer}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const FIELD_CLASS =
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 " +
+  "focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100";
+
+function Field({ label, hint, error, children, className = "" }) {
+  return (
+    <label className={classNames("block", className)}>
+      <span className="mb-1.5 block text-xs font-medium text-slate-600">{label}</span>
+      {children}
+      {error
+        ? <span className="mt-1 block text-xs text-rose-600">{error}</span>
+        : hint && <span className="mt-1 block text-xs text-slate-400">{hint}</span>}
+    </label>
+  );
+}
+
+const Input = (props) => <input {...props} className={classNames(FIELD_CLASS, props.className)} />;
+const Textarea = (props) => <textarea {...props} className={classNames(FIELD_CLASS, "resize-none", props.className)} />;
+
+function Select({ options, ...props }) {
+  return (
+    <select {...props} className={classNames(FIELD_CLASS, "appearance-none pr-8", props.className)}>
+      {options.map((o) => (
+        <option key={typeof o === "string" ? o : o.value} value={typeof o === "string" ? o : o.value}>
+          {typeof o === "string" ? o : o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function SearchBar({ value, onChange, placeholder = "Search…", className = "" }) {
+  return (
+    <div className={classNames("relative", className)}>
+      <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={classNames(FIELD_CLASS, "pl-9")}
+      />
+    </div>
+  );
+}
+
+function FilterDropdown({ value, onChange, options, label = "All" }) {
+  return (
+    <div className="relative">
+      <Filter size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={classNames(FIELD_CLASS, "appearance-none py-2 pl-8 pr-8 text-sm")}
+      >
+        <option value="all">{label}</option>
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+      <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+    </div>
+  );
+}
+
+function StarRating({ value, onChange, size = 22, readOnly = false }) {
+  const [hover, setHover] = useState(0);
+  const shown = hover || value;
+  return (
+    <div className="inline-flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          disabled={readOnly}
+          onMouseEnter={() => !readOnly && setHover(n)}
+          onMouseLeave={() => !readOnly && setHover(0)}
+          onClick={() => !readOnly && onChange(n)}
+          className={classNames("rounded transition-transform", !readOnly && "hover:scale-110")}
+          aria-label={`${n} star${n > 1 ? "s" : ""}`}
+        >
+          <Star
+            size={size}
+            className={n <= shown ? "fill-amber-400 text-amber-400" : "text-slate-300"}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ProgressBar({ value, max = 100, tint = "bg-indigo-600", className = "" }) {
+  const pct = Math.min(100, Math.round((value / (max || 1)) * 100));
+  return (
+    <div className={classNames("h-2 w-full overflow-hidden rounded-full bg-slate-100", className)}>
+      <div className={classNames("h-full rounded-full transition-all duration-500", tint)} style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
+/** Photo attachment control — real FileReader preview, no upload endpoint. */
+function PhotoPicker({ value, onChange, hint = "PNG or JPG, up to ~2 MB" }) {
+  const inputRef = useRef(null);
+  const [dragging, setDragging] = useState(false);
+
+  const read = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => onChange({ name: file.name, dataUrl: String(reader.result) });
+    reader.readAsDataURL(file);
+  };
+
+  if (value) {
+    return (
+      <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <img src={value.dataUrl} alt={value.name} className="h-16 w-16 rounded-lg border border-slate-200 object-cover" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-slate-800">{value.name}</p>
+          <p className="text-xs text-slate-400">Attached as evidence</p>
+        </div>
+        <Button variant="ghost" size="sm" type="button" onClick={() => onChange(null)}>
+          <Trash2 size={14} /> Remove
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(e) => { e.preventDefault(); setDragging(false); read(e.dataTransfer.files?.[0]); }}
+      onClick={() => inputRef.current?.click()}
+      className={classNames(
+        "flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors",
+        dragging ? "border-indigo-400 bg-indigo-50/60" : "border-slate-200 bg-slate-50/60 hover:border-indigo-300",
+      )}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => read(e.target.files?.[0])}
+      />
+      <Upload size={18} className="mb-2 text-slate-400" />
+      <p className="text-sm font-medium text-slate-600">Drop a photo here, or click to browse</p>
+      <p className="mt-0.5 text-xs text-slate-400">{hint}</p>
+    </div>
+  );
+}
+
+/* Signature element — Stripe's payment-lifecycle indicator, repurposed to
+   track a laundry bag from Scheduled through to Delivered. */
+function LaundryStepper({ current, timeline = {}, compact = false }) {
+  const idx = STATUS_STEPS.indexOf(current);
+  return (
+    <div className="overflow-x-auto pb-1">
+      <div className={classNames("flex items-start", compact ? "min-w-[520px]" : "min-w-[640px]")}>
+        {STATUS_STEPS.map((step, i) => {
+          const done = i < idx;
+          const active = i === idx;
+          const Icon = STEP_ICONS[step];
+          return (
+            <React.Fragment key={step}>
+              <div className="flex flex-col items-center text-center" style={{ width: compact ? 78 : 96 }}>
+                <div
+                  className={classNames(
+                    "flex items-center justify-center rounded-full border-2 transition-colors",
+                    compact ? "h-7 w-7" : "h-9 w-9",
+                    done && "border-indigo-600 bg-indigo-600 text-white",
+                    active && "border-indigo-600 bg-white text-indigo-600 ring-4 ring-indigo-100",
+                    !done && !active && "border-slate-200 bg-white text-slate-300",
+                  )}
+                >
+                  {done ? <CheckCircle2 size={compact ? 14 : 17} /> : <Icon size={compact ? 13 : 16} />}
+                </div>
+                <span
+                  className={classNames(
+                    "mt-2 text-[11px] leading-tight",
+                    active ? "font-semibold text-slate-900" : "text-slate-500",
+                  )}
+                >
+                  {step}
+                </span>
+                {!compact && (
+                  <span className="mt-0.5 text-[10px] text-slate-400">{timeline[step] || ""}</span>
+                )}
+              </div>
+              {i < STATUS_STEPS.length - 1 && (
+                <div
+                  className={classNames("h-0.5 flex-1 rounded", i < idx ? "bg-indigo-600" : "bg-slate-200")}
+                  style={{ marginTop: compact ? 13 : 17 }}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const TOAST_TONES = {
+  success: { icon: CheckCircle2, cls: "text-emerald-600" },
+  info: { icon: Bell, cls: "text-indigo-600" },
+  danger: { icon: XCircle, cls: "text-rose-600" },
+};
+
+function ToastHost() {
+  const { toasts, dismissToast } = useStore();
+  return (
+    <div className="pointer-events-none fixed bottom-5 right-5 z-[60] flex w-[min(360px,calc(100vw-2.5rem))] flex-col gap-2">
+      {toasts.map((t) => {
+        const tone = TOAST_TONES[t.tone] || TOAST_TONES.success;
+        const Icon = tone.icon;
+        return (
+          <div
+            key={t.id}
+            className="pointer-events-auto flex animate-[toastIn_180ms_ease-out] items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-lg"
+          >
+            <Icon size={17} className={classNames("mt-0.5 shrink-0", tone.cls)} />
+            <p className="flex-1 text-sm text-slate-700">{t.text}</p>
+            <button onClick={() => dismissToast(t.id)} className="text-slate-300 hover:text-slate-500">
+              <X size={14} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  6. Shell — sidebar + top bar shared by all three portals           */
+/* ------------------------------------------------------------------ */
+
+/** Keyframes the atoms above rely on, injected so the file stays self-contained. */
+function GlobalStyles() {
+  return (
+    <style>{`
+      @keyframes modalIn { from { opacity: 0; transform: translateY(6px) scale(.99); } to { opacity: 1; transform: none; } }
+      @keyframes toastIn { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+      @keyframes sweep { 0% { top: 6%; } 50% { top: 90%; } 100% { top: 6%; } }
+      @keyframes pulseRing { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+      .shlms-sweep { animation: sweep 2.1s ease-in-out infinite; }
+      .shlms-pulse { animation: pulseRing 1.6s ease-in-out infinite; }
+      body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+    `}</style>
+  );
+}
+
+function NotificationBell({ audience }) {
+  const { notifications, markAllRead } = useStore();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const mine = notifications.filter((n) => n.audience === audience);
+  const unread = mine.filter((n) => !n.read).length;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="relative flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50"
+        aria-label="Notifications"
+      >
+        <Bell size={16} />
+        {unread > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-semibold text-white">
+            {unread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 z-40 mt-2 w-[min(340px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+            <p className="text-sm font-semibold text-slate-900">Notifications</p>
+            <button
+              onClick={() => markAllRead(audience)}
+              className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+            >
+              Mark all read
+            </button>
+          </div>
+          <div className="max-h-80 overflow-y-auto">
+            {mine.length === 0 && <EmptyState icon={Bell} title="No notifications yet" />}
+            {mine.map((n) => (
+              <div key={n.id} className="flex gap-3 border-b border-slate-50 px-4 py-3 last:border-0">
+                <span
+                  className={classNames(
+                    "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
+                    n.read ? "bg-slate-300" : "bg-indigo-500",
+                  )}
+                />
+                <div className="min-w-0">
+                  <p className="text-sm leading-snug text-slate-700">{n.text}</p>
+                  <p className="mt-0.5 text-xs text-slate-400">{n.at}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 bg-slate-50 px-4 py-2.5 text-[11px] text-slate-400">
+            <Mail size={12} /> Mirrors the email notification service in the SRS.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Shell({ role, roleLabel, userName, initials, navItems, active, onNavigate, onExit, children }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const current = navItems.find((n) => n.key === active);
+
+  const nav = (
+    <>
+      <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white">
+          <Shirt size={16} />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-slate-900">SHLMS</p>
+          <p className="text-[11px] text-slate-400">Hostel Laundry System</p>
+        </div>
+      </div>
+
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = active === item.key;
+          return (
+            <button
+              key={item.key}
+              onClick={() => { onNavigate(item.key); setMobileOpen(false); }}
+              className={classNames(
+                "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                isActive ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-50",
+              )}
+            >
+              <Icon size={17} className={isActive ? "text-indigo-600" : "text-slate-400"} />
+              <span className="flex-1 text-left">{item.label}</span>
+              {item.badge ? (
+                <span className="rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-600">
+                  {item.badge}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="border-t border-slate-100 p-3">
+        <button
+          onClick={onExit}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-50"
+        >
+          <LogOut size={17} className="text-slate-400" />
+          Switch role
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex min-h-screen bg-slate-50">
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">{nav}</aside>
+
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-slate-900/40" onClick={() => setMobileOpen(false)} />
+          <aside className="relative flex h-full w-64 flex-col border-r border-slate-200 bg-white">{nav}</aside>
+        </div>
+      )}
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-8 sm:py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 lg:hidden"
+              aria-label="Open navigation"
+            >
+              <Menu size={17} />
+            </button>
+            <div className="min-w-0">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-indigo-700">
+                <ShieldCheck size={11} /> {roleLabel}
+              </span>
+              <h1 className="mt-1 truncate text-lg font-semibold text-slate-900 sm:text-xl">
+                {current?.label}
+              </h1>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-3">
+            <NotificationBell audience={role} />
+            <div className="hidden text-right sm:block">
+              <p className="text-sm font-medium text-slate-800">{userName}</p>
+              <p className="text-[11px] text-slate-400">{roleLabel}</p>
+            </div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
+              {initials}
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 px-4 py-6 sm:px-8 sm:py-7">{children}</main>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  7. Landing / role selection                                        */
+/* ------------------------------------------------------------------ */
+
+const ROLE_CARDS = [
+  {
+    key: "student", title: "Student", icon: Shirt,
+    desc: "Track a bag through the wash, check history, raise a complaint, claim a lost item.",
+    points: ["Live status stepper", "Digital receipts & OTP", "Lost & Found claims"],
+  },
+  {
+    key: "staff", title: "Laundry Staff", icon: ClipboardList,
+    desc: "Scan a student barcode, log the bag, move it through the pipeline, hand it back on OTP.",
+    points: ["QR scan & submit", "Queue quick-advance", "OTP handover"],
+  },
+  {
+    key: "admin", title: "Administrator", icon: ShieldCheck,
+    desc: "Watch load across blocks, manage accounts and schedules, resolve complaints, export reports.",
+    points: ["Analytics dashboard", "Block schedule control", "PDF / Excel reports"],
+  },
+];
+
+function Landing({ onPick }) {
+  const { records, users, feedback } = useStore();
+  const delivered = records.filter((r) => r.status === "Delivered").length;
+  const avgRating = feedback.length
+    ? (feedback.reduce((t, f) => t + f.overall, 0) / feedback.length).toFixed(1)
+    : "—";
+
+  return (
+    <div className="min-h-screen bg-white">
+      <header className="border-b border-slate-100 bg-gradient-to-b from-indigo-50/70 to-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white">
+              <Shirt size={16} />
+            </div>
+            <span className="text-sm font-semibold text-slate-900">SHLMS</span>
+          </div>
+          <span className="hidden text-xs text-slate-500 sm:block">
+            Frontend prototype · no backend, no database
+          </span>
+        </div>
+
+        <div className="mx-auto max-w-3xl px-6 pb-16 pt-10 text-center">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-white px-3 py-1 text-xs font-medium text-indigo-700">
+            <Sparkles size={12} /> Smart Hostel Laundry Management System
+          </span>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+            Hostel laundry, tracked end to end.
+          </h1>
+          <p className="mx-auto mt-4 max-w-xl text-base text-slate-500">
+            SHLMS replaces the register at the laundry counter with a live status a student can
+            check from their room — and gives staff and hostel admins the same picture.
+          </p>
+          <p className="mt-6 text-xs text-slate-400">Pick a portal to continue</p>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-6xl px-6">
+        <div className="-mt-8 grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-3">
+          {[
+            { label: "Active accounts", value: users.filter((u) => u.status === "Active").length, icon: Users },
+            { label: "Cycles completed", value: delivered, icon: CheckCircle2 },
+            { label: "Average rating", value: `${avgRating} / 5`, icon: Star },
+          ].map((m) => (
+            <div key={m.label} className="flex items-center gap-3 bg-white px-5 py-4">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                <m.icon size={17} />
+              </div>
+              <div>
+                <p className="text-lg font-semibold text-slate-900">{m.value}</p>
+                <p className="text-xs text-slate-500">{m.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mx-auto grid max-w-6xl gap-5 px-6 py-14 sm:grid-cols-2 lg:grid-cols-3">
+        {ROLE_CARDS.map((r) => (
+          <button
+            key={r.key}
+            onClick={() => onPick(r.key)}
+            className="group rounded-xl border border-slate-200 bg-white p-6 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
+          >
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 transition-colors group-hover:bg-indigo-600 group-hover:text-white">
+              <r.icon size={19} />
+            </div>
+            <p className="text-base font-semibold text-slate-900">{r.title}</p>
+            <p className="mt-1 text-sm leading-relaxed text-slate-500">{r.desc}</p>
+            <ul className="mt-4 space-y-1.5">
+              {r.points.map((p) => (
+                <li key={p} className="flex items-center gap-2 text-xs text-slate-500">
+                  <Check size={13} className="text-emerald-500" /> {p}
+                </li>
+              ))}
+            </ul>
+            <span className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-indigo-600">
+              Continue <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <footer className="border-t border-slate-100 bg-slate-50/60">
+        <div className="mx-auto max-w-6xl px-6 py-6 text-center text-xs text-slate-400">
+          Screens map to the SRS requirements listed in Section 8 of the frontend design document.
+          All actions run against in-memory state and reset on reload.
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  8. Student portal                                                  */
+/* ------------------------------------------------------------------ */
+
+function useMyRecords() {
+  const { records } = useStore();
+  return useMemo(() => records.filter((r) => r.regNo === ME.regNo), [records]);
+}
+
+function ItemBreakdown({ items }) {
+  const present = GARMENTS.filter((g) => Number(items?.[g.key]) > 0);
+  if (!present.length) return <p className="text-sm text-slate-400">Not itemised yet — bag is still to be scanned.</p>;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {present.map((g) => (
+        <span key={g.key} className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-600">
+          {g.label} <span className="font-semibold text-slate-900">× {items[g.key]}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function DetailGrid({ rows }) {
+  return (
+    <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {rows.map((r) => (
+        <div key={r.label}>
+          <dt className="text-xs text-slate-500">{r.label}</dt>
+          <dd className="mt-1 text-sm font-medium text-slate-900">{r.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function StudentPortal({ onExit }) {
+  const [tab, setTab] = useState("overview");
+  const { complaints } = useStore();
+  const openCount = complaints.filter((c) => c.regNo === ME.regNo && c.status !== "Resolved").length;
+
+  const navItems = [
+    { key: "overview", label: "Overview", icon: LayoutGrid },
+    { key: "track", label: "Track Laundry", icon: Activity },
+    { key: "history", label: "History", icon: History },
+    { key: "complaints", label: "Complaints", icon: MessageSquare, badge: openCount || null },
+    { key: "lostfound", label: "Lost & Found", icon: Package },
+    { key: "feedback", label: "Feedback", icon: Star },
+  ];
+
+  return (
+    <Shell
+      role="student"
+      roleLabel="Student portal"
+      userName={ME.name}
+      initials="AM"
+      navItems={navItems}
+      active={tab}
+      onNavigate={setTab}
+      onExit={onExit}
+    >
+      {tab === "overview" && <StudentOverview go={setTab} />}
+      {tab === "track" && <StudentTrack />}
+      {tab === "history" && <StudentHistory />}
+      {tab === "complaints" && <StudentComplaints />}
+      {tab === "lostfound" && <StudentLostFound />}
+      {tab === "feedback" && <StudentFeedback />}
+    </Shell>
+  );
+}
+
+function StudentOverview({ go }) {
+  const { complaints, schedule, notifications } = useStore();
+  const mine = useMyRecords();
+  const active = mine.find((r) => r.status !== "Delivered") || mine[0];
+  const openComplaints = complaints.filter((c) => c.regNo === ME.regNo && c.status !== "Resolved");
+  const feed = notifications.filter((n) => n.audience === "student").slice(0, 5);
+
+  const quick = [
+    { label: "Raise complaint", icon: MessageSquare, tab: "complaints" },
+    { label: "Give feedback", icon: Star, tab: "feedback" },
+    { label: "Lost & Found", icon: Package, tab: "lostfound" },
+    { label: "View history", icon: History, tab: "history" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Next laundry day" value={schedule[ME.block]} sub={`${ME.block} · Room ${ME.room}`}
+          icon={Calendar}
+        />
+        <StatCard
+          label="Current status" value={active ? active.status : "No active bag"}
+          sub={active ? `Record ${active.id}` : "Nothing in the wash"} icon={Clock} tint="amber"
+        />
+        <StatCard
+          label="Open complaints" value={openComplaints.length}
+          sub={openComplaints.length ? "Awaiting the hostel office" : "All clear"}
+          icon={AlertCircle} tint={openComplaints.length ? "rose" : "emerald"}
+        />
+        <StatCard
+          label="Cycles completed" value={mine.filter((r) => r.status === "Delivered").length}
+          sub="This semester" icon={CheckCircle2} tint="emerald"
+        />
+      </div>
+
+      {active ? (
+        <Card className="p-5 sm:p-6">
+          <SectionHeader
+            title="Current laundry"
+            subtitle={`${active.id} · submitted ${active.submittedAt} · ${active.itemCount} items · handled by ${active.staff}`}
+            action={
+              <Button variant="secondary" onClick={() => go("track")}>
+                View details <ChevronRight size={15} />
+              </Button>
+            }
+          />
+          <LaundryStepper current={active.status} timeline={active.timeline} />
+          {active.status === "Ready for Pickup" && active.otp && (
+            <div className="mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <KeyRound size={16} className="text-emerald-600" />
+              <p className="text-sm text-emerald-800">
+                Ready for collection. Show this OTP at the counter:
+                <span className="ml-2 font-mono text-base font-semibold tracking-[0.2em]">{active.otp}</span>
+              </p>
+            </div>
+          )}
+        </Card>
+      ) : (
+        <Card><EmptyState icon={Shirt} title="No active laundry" hint="Your next scheduled pickup is shown above." /></Card>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="p-5">
+          <p className="text-sm font-semibold text-slate-900">Quick actions</p>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {quick.map((q) => (
+              <Button key={q.label} variant="secondary" className="justify-start" onClick={() => go(q.tab)}>
+                <q.icon size={15} className="text-slate-400" /> {q.label}
+              </Button>
+            ))}
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <p className="text-sm font-semibold text-slate-900">Recent notifications</p>
+          <ul className="mt-3 space-y-3">
+            {feed.length === 0 && <li className="text-sm text-slate-400">Nothing new.</li>}
+            {feed.map((n) => (
+              <li key={n.id} className="flex gap-2.5">
+                <span className={classNames("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", n.read ? "bg-slate-300" : "bg-indigo-500")} />
+                <div>
+                  <p className="text-sm leading-snug text-slate-600">{n.text}</p>
+                  <p className="text-xs text-slate-400">{n.at}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function StudentTrack() {
+  const mine = useMyRecords();
+  const [selectedId, setSelectedId] = useState(null);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+
+  const active = mine.find((r) => r.id === selectedId)
+    || mine.find((r) => r.status !== "Delivered")
+    || mine[0];
+
+  const rows = mine.filter((r) => {
+    const q = query.trim().toLowerCase();
+    const matchQ = !q || r.id.toLowerCase().includes(q) || r.status.toLowerCase().includes(q) || String(r.staff).toLowerCase().includes(q);
+    const matchS = status === "all" || r.status === status;
+    return matchQ && matchS;
+  });
+
+  return (
+    <div className="space-y-6">
+      {active && (
+        <Card className="p-5 sm:p-6">
+          <SectionHeader
+            title={`Record ${active.id}`}
+            subtitle={`Submitted ${active.submittedAt} · ${ME.block}, Room ${ME.room}`}
+            action={<StatusPill status={active.status} />}
+          />
+          <LaundryStepper current={active.status} timeline={active.timeline} />
+
+          <div className="mt-6 border-t border-slate-100 pt-5">
+            <DetailGrid
+              rows={[
+                { label: "Handled by", value: active.staff },
+                { label: "Items", value: `${active.itemCount} pieces` },
+                { label: "Weight", value: `${active.weightKg} kg` },
+                { label: "Pickup OTP", value: active.otp ? <span className="font-mono tracking-widest">{active.otp}</span> : "Issued when ready" },
+              ]}
+            />
+            <div className="mt-5">
+              <p className="mb-2 text-xs text-slate-500">Itemised breakdown</p>
+              <ItemBreakdown items={active.items} />
+            </div>
+            {active.remarks && (
+              <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                <span className="font-medium text-slate-800">Remarks:</span> {active.remarks}
+              </p>
+            )}
+          </div>
+        </Card>
+      )}
+
+      <Card className="p-5 sm:p-6">
+        <SectionHeader
+          title="All my records"
+          subtitle="Select any row to load it into the tracker above."
+          action={
+            <div className="flex flex-wrap gap-2">
+              <SearchBar value={query} onChange={setQuery} placeholder="Search record or staff" className="w-full sm:w-56" />
+              <FilterDropdown value={status} onChange={setStatus} options={STATUS_STEPS} label="All statuses" />
+            </div>
+          }
+        />
+        <Table
+          columns={[
+            { key: "id", label: "Record" },
+            { key: "submittedAt", label: "Submitted" },
+            { key: "itemCount", label: "Items" },
+            { key: "weightKg", label: "Weight" },
+            { key: "staff", label: "Handler" },
+            { key: "status", label: "Status" },
+            { key: "action", label: "", align: "right" },
+          ]}
+          rows={rows}
+          empty="No records match this filter."
+          render={(r, key) => {
+            if (key === "id") return <span className="font-medium text-slate-900">{r.id}</span>;
+            if (key === "weightKg") return `${r.weightKg} kg`;
+            if (key === "status") return <StatusPill status={r.status} />;
+            if (key === "action") {
+              return (
+                <Button variant="ghost" size="sm" onClick={() => setSelectedId(r.id)}>
+                  Track <ChevronRight size={13} />
+                </Button>
+              );
+            }
+            return r[key];
+          }}
+        />
+      </Card>
+    </div>
+  );
+}
+
+function StudentHistory() {
+  const mine = useMyRecords();
+  const [receipt, setReceipt] = useState(null);
+  const [query, setQuery] = useState("");
+  const history = mine.filter((r) => r.status === "Delivered");
+  const rows = history.filter((r) => !query.trim() || r.id.toLowerCase().includes(query.trim().toLowerCase()));
+
+  const totalItems = history.reduce((t, r) => t + r.itemCount, 0);
+  const totalWeight = history.reduce((t, r) => t + r.weightKg, 0).toFixed(1);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Completed cycles" value={history.length} sub="Delivered and closed" icon={CheckCircle2} tint="emerald" />
+        <StatCard label="Pieces washed" value={totalItems} sub="Across all cycles" icon={Layers} />
+        <StatCard label="Total weight" value={`${totalWeight} kg`} sub="Billed by weight slab" icon={Gauge} tint="slate" />
+      </div>
+
+      <Card className="p-5 sm:p-6">
+        <SectionHeader
+          title="Laundry history"
+          subtitle="Every completed cycle, with the OTP used at handover."
+          action={<SearchBar value={query} onChange={setQuery} placeholder="Search by record id" className="w-full sm:w-60" />}
+        />
+        <Table
+          columns={[
+            { key: "id", label: "Record" },
+            { key: "submittedAt", label: "Submitted" },
+            { key: "deliveredAt", label: "Delivered" },
+            { key: "itemCount", label: "Items" },
+            { key: "otp", label: "Pickup OTP" },
+            { key: "action", label: "", align: "right" },
+          ]}
+          rows={rows}
+          empty="No completed cycles yet."
+          render={(r, key) => {
+            if (key === "id") return <span className="font-medium text-slate-900">{r.id}</span>;
+            if (key === "otp") return <span className="font-mono text-xs tracking-widest text-slate-500">{r.otp || "—"}</span>;
+            if (key === "action") {
+              return <Button variant="secondary" size="sm" onClick={() => setReceipt(r)}><FileText size={13} /> Receipt</Button>;
+            }
+            return r[key] ?? "—";
+          }}
+        />
+      </Card>
+
+      <Modal
+        open={!!receipt}
+        onClose={() => setReceipt(null)}
+        title={receipt ? `Digital receipt · ${receipt.id}` : ""}
+        subtitle="Frontend-generated summary — no billing backend is connected."
+        footer={<Button variant="secondary" onClick={() => setReceipt(null)}>Close</Button>}
+      >
+        {receipt && (
+          <div className="space-y-5">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <DetailGrid
+                rows={[
+                  { label: "Student", value: `${ME.name} (${ME.regNo})` },
+                  { label: "Block / Room", value: `${ME.block} · ${ME.room}` },
+                  { label: "Submitted", value: receipt.submittedAt },
+                  { label: "Delivered", value: receipt.deliveredAt || "—" },
+                ]}
+              />
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-medium text-slate-600">Items</p>
+              <ItemBreakdown items={receipt.items} />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
+              <span className="text-sm text-slate-500">Total</span>
+              <span className="text-sm font-semibold text-slate-900">
+                {receipt.itemCount} pieces · {receipt.weightKg} kg
+              </span>
+            </div>
+            <p className="text-xs text-slate-400">
+              Handled by {receipt.staff}. Handover confirmed with OTP {receipt.otp || "—"}.
+            </p>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+function StudentComplaints() {
+  const { complaints, raiseComplaint } = useStore();
+  const mine = useMyRecords();
+  const [filter, setFilter] = useState("all");
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ recordId: "", category: COMPLAINT_CATEGORIES[0], subject: "", description: "", photo: null });
+  const [errors, setErrors] = useState({});
+
+  const list = complaints
+    .filter((c) => c.regNo === ME.regNo)
+    .filter((c) => filter === "all" || c.status === filter);
+
+  const reset = () => {
+    setForm({ recordId: mine[0]?.id || "", category: COMPLAINT_CATEGORIES[0], subject: "", description: "", photo: null });
+    setErrors({});
+  };
+
+  const submit = () => {
+    const next = {};
+    if (!form.recordId) next.recordId = "Choose the laundry record this is about.";
+    if (!form.subject.trim()) next.subject = "Add a short subject line.";
+    if (form.description.trim().length < 12) next.description = "Give the office a little more detail (12+ characters).";
+    setErrors(next);
+    if (Object.keys(next).length) return;
+    raiseComplaint({ ...form, photo: form.photo?.dataUrl || null });
+    setOpen(false);
+    reset();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        {["Open", "Under Review", "Resolved"].map((s, i) => (
+          <StatCard
+            key={s}
+            label={s}
+            value={complaints.filter((c) => c.regNo === ME.regNo && c.status === s).length}
+            sub={s === "Resolved" ? "Closed by the office" : "Awaiting action"}
+            icon={[AlertCircle, Timer, CheckCircle2][i]}
+            tint={["rose", "amber", "emerald"][i]}
+          />
+        ))}
+      </div>
+
+      <Card className="p-5 sm:p-6">
+        <SectionHeader
+          title="My complaints"
+          subtitle="Raised against a specific laundry record, with optional photo evidence."
+          action={
+            <div className="flex flex-wrap gap-2">
+              <FilterDropdown value={filter} onChange={setFilter} options={["Open", "Under Review", "Resolved"]} label="All statuses" />
+              <Button onClick={() => { reset(); setOpen(true); }}><Plus size={15} /> Raise complaint</Button>
+            </div>
+          }
+        />
+        <Table
+          columns={[
+            { key: "id", label: "Ticket" },
+            { key: "recordId", label: "Record" },
+            { key: "category", label: "Category" },
+            { key: "subject", label: "Subject" },
+            { key: "createdAt", label: "Raised" },
+            { key: "status", label: "Status" },
+          ]}
+          rows={list}
+          empty="No complaints raised."
+          render={(c, key) => {
+            if (key === "id") return <span className="font-medium text-slate-900">{c.id}</span>;
+            if (key === "status") return <StatusPill status={c.status} />;
+            if (key === "subject") {
+              return (
+                <div className="max-w-xs">
+                  <p className="truncate text-slate-800">{c.subject}</p>
+                  {c.photo && <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-slate-400"><Camera size={11} /> photo attached</span>}
+                  {c.status === "Resolved" && c.resolution && (
+                    <p className="mt-1 truncate text-xs text-emerald-600">Resolved: {c.resolution}</p>
+                  )}
+                </div>
+              );
+            }
+            return c[key];
+          }}
+        />
+      </Card>
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Raise a complaint"
+        subtitle="Goes straight to the hostel office queue in the Admin portal."
+        width="max-w-xl"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={submit}><Send size={15} /> Submit complaint</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Laundry record" error={errors.recordId}>
+              <Select
+                value={form.recordId}
+                onChange={(e) => setForm({ ...form, recordId: e.target.value })}
+                options={[{ value: "", label: "Select a record…" }, ...mine.map((r) => ({ value: r.id, label: `${r.id} · ${r.submittedAt} · ${r.itemCount} items` }))]}
+              />
+            </Field>
+            <Field label="Category">
+              <Select
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                options={COMPLAINT_CATEGORIES}
+              />
+            </Field>
+          </div>
+          <Field label="Subject" error={errors.subject}>
+            <Input
+              value={form.subject}
+              onChange={(e) => setForm({ ...form, subject: e.target.value })}
+              placeholder="e.g. Missing one navy t-shirt"
+            />
+          </Field>
+          <Field label="What happened?" error={errors.description}>
+            <Textarea
+              rows={4}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="Describe the item, when you noticed, and anything the staff should check."
+            />
+          </Field>
+          <Field label="Photo evidence (optional)">
+            <PhotoPicker value={form.photo} onChange={(p) => setForm({ ...form, photo: p })} />
+          </Field>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function StudentLostFound() {
+  const { lostItems, claimLostItem } = useStore();
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
+  const [claiming, setClaiming] = useState(null);
+  const [proof, setProof] = useState("");
+  const [error, setError] = useState("");
+
+  const list = lostItems.filter((i) => {
+    const q = query.trim().toLowerCase();
+    const matchQ = !q || i.description.toLowerCase().includes(q) || i.color.toLowerCase().includes(q);
+    return matchQ && (category === "all" || i.category === category);
+  });
+
+  const submitClaim = () => {
+    if (proof.trim().length < 10) { setError("Describe a detail only the owner would know (10+ characters)."); return; }
+    claimLostItem(claiming.id, proof.trim());
+    setClaiming(null);
+    setProof("");
+    setError("");
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card className="p-5 sm:p-6">
+        <SectionHeader
+          title="Lost & Found board"
+          subtitle="Items staff pulled out of the wash without a name tag. Claims are verified by the hostel office before release."
+          action={
+            <div className="flex flex-wrap gap-2">
+              <SearchBar value={query} onChange={setQuery} placeholder="Search item or colour" className="w-full sm:w-56" />
+              <FilterDropdown value={category} onChange={setCategory} options={LF_CATEGORIES} label="All categories" />
+            </div>
+          }
+        />
+
+        {list.length === 0 ? (
+          <EmptyState icon={PackageSearch} title="Nothing on the board" hint="Items appear here as soon as staff upload them." />
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {list.map((item) => (
+              <Card key={item.id} className="overflow-hidden">
+                <div className="flex h-32 items-center justify-center border-b border-slate-100 bg-slate-50">
+                  {item.photo
+                    ? <img src={item.photo} alt={item.description} className="h-full w-full object-cover" />
+                    : <Package size={26} className="text-slate-300" />}
+                </div>
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-900">{item.id}</p>
+                    <StatusPill status={item.status} />
+                  </div>
+                  <p className="mt-1.5 text-sm leading-snug text-slate-600">{item.description}</p>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700">{item.category}</span>
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{item.color}</span>
+                  </div>
+                  <p className="mt-3 flex items-center gap-1.5 text-xs text-slate-400">
+                    <MapPin size={12} /> {item.foundPlace} · {item.foundAt}
+                  </p>
+                  <div className="mt-4">
+                    {item.status === "Available" && (
+                      <Button size="sm" className="w-full" onClick={() => { setClaiming(item); setProof(""); setError(""); }}>
+                        Claim this item
+                      </Button>
+                    )}
+                    {item.status === "Claim Pending" && (
+                      <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                        Claim submitted by {item.claim?.by} — awaiting office verification.
+                      </p>
+                    )}
+                    {item.status === "Returned" && (
+                      <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                        Released to {item.claim?.by}.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Modal
+        open={!!claiming}
+        onClose={() => setClaiming(null)}
+        title={claiming ? `Claim ${claiming.id}` : ""}
+        subtitle="The office matches your description against the item before releasing it."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setClaiming(null)}>Cancel</Button>
+            <Button onClick={submitClaim}><ShieldCheck size={15} /> Submit claim</Button>
+          </>
+        }
+      >
+        {claiming && (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              <span className="font-medium text-slate-900">{claiming.description}</span>
+              <span className="block text-xs text-slate-400">
+                {claiming.category} · {claiming.color} · found at {claiming.foundPlace} on {claiming.foundAt}
+              </span>
+            </div>
+            <Field label="Proof of ownership" error={error} hint="A mark, stain, tag or purchase detail that identifies it as yours.">
+              <Textarea rows={4} value={proof} onChange={(e) => setProof(e.target.value)} placeholder="e.g. Small ink stain on the left cuff and my initials stitched inside the collar." />
+            </Field>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+const FEEDBACK_DIMENSIONS = [
+  { key: "cleanliness", label: "Cleanliness", hint: "How well were the clothes washed?" },
+  { key: "speed", label: "Turnaround speed", hint: "Did it come back on time?" },
+  { key: "care", label: "Garment care", hint: "Any shrinking, tearing or colour bleed?" },
+];
+
+function StudentFeedback() {
+  const { feedback, submitFeedback } = useStore();
+  const mine = useMyRecords().filter((r) => r.status === "Delivered");
+  const rated = new Set(feedback.filter((f) => f.regNo === ME.regNo).map((f) => f.recordId));
+  const [form, setForm] = useState({ recordId: "", overall: 0, cleanliness: 0, speed: 0, care: 0, note: "" });
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!form.recordId) {
+      const next = mine.find((r) => !rated.has(r.id)) || mine[0];
+      if (next) setForm((f) => ({ ...f, recordId: next.id }));
+    }
+  }, [mine, form.recordId, rated]);
+
+  const myFeedback = feedback.filter((f) => f.regNo === ME.regNo);
+  const avg = myFeedback.length ? (myFeedback.reduce((t, f) => t + f.overall, 0) / myFeedback.length).toFixed(1) : "—";
+
+  const submit = () => {
+    if (!form.recordId) { setError("Pick the delivery you are rating."); return; }
+    if (!form.overall) { setError("Give an overall star rating."); return; }
+    setError("");
+    submitFeedback({ ...form });
+    setForm({ recordId: "", overall: 0, cleanliness: 0, speed: 0, care: 0, note: "" });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Ratings submitted" value={myFeedback.length} sub="Across delivered cycles" icon={ThumbsUp} />
+        <StatCard label="Your average" value={`${avg} / 5`} sub="Overall service score" icon={Star} tint="amber" />
+        <StatCard label="Awaiting rating" value={mine.filter((r) => !rated.has(r.id)).length} sub="Delivered but unrated" icon={Timer} tint="slate" />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-5">
+        <Card className="p-5 sm:p-6 lg:col-span-3">
+          <SectionHeader title="Rate a delivery" subtitle="Ratings feed the average service score on the admin dashboard." />
+          <div className="space-y-5">
+            <Field label="Delivered record">
+              <Select
+                value={form.recordId}
+                onChange={(e) => setForm({ ...form, recordId: e.target.value })}
+                options={mine.length
+                  ? mine.map((r) => ({ value: r.id, label: `${r.id} · delivered ${r.deliveredAt}${rated.has(r.id) ? " (already rated)" : ""}` }))
+                  : [{ value: "", label: "No delivered records yet" }]}
+              />
+            </Field>
+
+            <div className="rounded-lg border border-slate-200 p-4">
+              <p className="text-xs font-medium text-slate-600">Overall experience</p>
+              <div className="mt-2 flex items-center gap-3">
+                <StarRating value={form.overall} onChange={(v) => setForm({ ...form, overall: v })} />
+                <span className="text-sm text-slate-500">{form.overall ? `${form.overall} / 5` : "Tap to rate"}</span>
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              {FEEDBACK_DIMENSIONS.map((d) => (
+                <div key={d.key} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">{d.label}</p>
+                    <p className="text-xs text-slate-400">{d.hint}</p>
+                  </div>
+                  <StarRating size={18} value={form[d.key]} onChange={(v) => setForm({ ...form, [d.key]: v })} />
+                </div>
+              ))}
+            </div>
+
+            <Field label="Anything else? (optional)" error={error}>
+              <Textarea rows={3} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Tell the laundry team what went well or what to fix." />
+            </Field>
+
+            <Button onClick={submit} disabled={!mine.length}><Send size={15} /> Submit rating</Button>
+          </div>
+        </Card>
+
+        <Card className="p-5 sm:p-6 lg:col-span-2">
+          <SectionHeader title="Your past ratings" />
+          {myFeedback.length === 0 ? (
+            <EmptyState icon={Star} title="No ratings yet" hint="Rate a delivered cycle to see it here." />
+          ) : (
+            <ul className="space-y-3">
+              {myFeedback.map((f) => (
+                <li key={f.id} className="rounded-lg border border-slate-200 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-slate-900">{f.recordId}</span>
+                    <StarRating value={f.overall} size={14} readOnly onChange={() => {}} />
+                  </div>
+                  {f.note && <p className="mt-2 text-sm text-slate-600">{f.note}</p>}
+                  <p className="mt-2 text-xs text-slate-400">
+                    Cleanliness {f.cleanliness} · Speed {f.speed} · Care {f.care} · {f.at}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  9. Laundry staff portal                                            */
+/* ------------------------------------------------------------------ */
+
+const STAFF = { name: "Ravi Kumar", id: "STF-114", shift: "Morning shift", block: "Block C" };
+
+function StaffPortal({ onExit }) {
+  const [tab, setTab] = useState("queue");
+  const { records } = useStore();
+  const pendingOtp = records.filter((r) => r.status === "Ready for Pickup").length;
+
+  const navItems = [
+    { key: "queue", label: "Today's Queue", icon: ClipboardList },
+    { key: "scan", label: "Scan & Submit", icon: QrCode },
+    { key: "deliver", label: "Verify & Deliver", icon: KeyRound, badge: pendingOtp || null },
+    { key: "lost", label: "Upload Lost Item", icon: Package },
+  ];
+
+  return (
+    <Shell
+      role="staff"
+      roleLabel="Laundry staff"
+      userName={STAFF.name}
+      initials="RK"
+      navItems={navItems}
+      active={tab}
+      onNavigate={setTab}
+      onExit={onExit}
+    >
+      {tab === "queue" && <StaffQueue go={setTab} />}
+      {tab === "scan" && <StaffScan go={setTab} />}
+      {tab === "deliver" && <StaffDeliver />}
+      {tab === "lost" && <StaffLostFound />}
+    </Shell>
+  );
+}
+
+function StaffQueue({ go }) {
+  const { records, complaints, advanceRecord } = useStore();
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+
+  const active = records.filter((r) => r.status !== "Delivered");
+  const rows = active.filter((r) => {
+    const q = query.trim().toLowerCase();
+    const matchQ = !q || r.student.toLowerCase().includes(q) || r.id.toLowerCase().includes(q) || r.room.toLowerCase().includes(q);
+    return matchQ && (status === "all" || r.status === status);
+  });
+
+  const count = (s) => records.filter((r) => r.status === s).length;
+  const openComplaints = complaints.filter((c) => c.status !== "Resolved").length;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Assigned today" value={active.length} sub={`${STAFF.shift} · ${STAFF.block}`} icon={ClipboardList} />
+        <StatCard label="Scan pending" value={count("Scheduled")} sub="Bags not yet logged" icon={ScanLine} tint="slate" />
+        <StatCard label="In wash / dry" value={count("Washing") + count("Drying")} sub="Machines running" icon={Droplets} tint="amber" />
+        <StatCard label="Ready for pickup" value={count("Ready for Pickup")} sub="Awaiting OTP handover" icon={Package} tint="emerald" />
+      </div>
+
+      {openComplaints > 0 && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <AlertCircle size={17} className="mt-0.5 shrink-0 text-amber-600" />
+          <p className="text-sm text-amber-800">
+            {openComplaints} complaint{openComplaints > 1 ? "s are" : " is"} still open with the hostel office.
+            Check flagged bags before they go back out.
+          </p>
+        </div>
+      )}
+
+      <Card className="p-5 sm:p-6">
+        <SectionHeader
+          title="Today's queue"
+          subtitle="Advance a bag one stage at a time. Delivery itself is completed on the Verify & Deliver screen."
+          action={
+            <div className="flex flex-wrap gap-2">
+              <SearchBar value={query} onChange={setQuery} placeholder="Search student, room or record" className="w-full sm:w-64" />
+              <FilterDropdown value={status} onChange={setStatus} options={STATUS_STEPS.slice(0, 5)} label="All stages" />
+              <Button onClick={() => go("scan")}><QrCode size={15} /> Scan a bag</Button>
+            </div>
+          }
+        />
+        <Table
+          columns={[
+            { key: "id", label: "Record" },
+            { key: "student", label: "Student" },
+            { key: "room", label: "Block / Room" },
+            { key: "itemCount", label: "Items" },
+            { key: "progress", label: "Progress" },
+            { key: "status", label: "Stage" },
+            { key: "action", label: "", align: "right" },
+          ]}
+          rows={rows}
+          empty="Queue is clear."
+          render={(r, key) => {
+            if (key === "id") return <span className="font-medium text-slate-900">{r.id}</span>;
+            if (key === "student") {
+              return (
+                <div>
+                  <p className="text-slate-900">{r.student}</p>
+                  <p className="text-xs text-slate-400">{r.regNo}</p>
+                </div>
+              );
+            }
+            if (key === "room") return `${r.block} · ${r.room}`;
+            if (key === "itemCount") return r.itemCount || "—";
+            if (key === "progress") {
+              return (
+                <div className="w-28">
+                  <ProgressBar value={STATUS_STEPS.indexOf(r.status)} max={STATUS_STEPS.length - 1} />
+                </div>
+              );
+            }
+            if (key === "status") return <StatusPill status={r.status} />;
+            if (key === "action") {
+              if (r.status === "Scheduled") {
+                return <Button size="sm" variant="secondary" onClick={() => go("scan")}><ScanLine size={13} /> Scan</Button>;
+              }
+              if (r.status === "Ready for Pickup") {
+                return <span className="text-xs text-slate-400">Awaiting OTP</span>;
+              }
+              const next = STATUS_STEPS[STATUS_STEPS.indexOf(r.status) + 1];
+              return (
+                <Button size="sm" onClick={() => advanceRecord(r.id)}>
+                  Move to {next} <ArrowRight size={13} />
+                </Button>
+              );
+            }
+            return r[key];
+          }}
+        />
+      </Card>
+    </div>
+  );
+}
+
+/* --- Scan & Submit -------------------------------------------------- */
+
+const SCANNABLE = [
+  { regNo: ME.regNo, student: ME.name, block: ME.block, room: ME.room },
+  { regNo: "23BCE1104", student: "Priya Sharma", block: "Block A", room: "A-108" },
+  { regNo: "23BCE1220", student: "Karthik R.", block: "Block B", room: "B-302" },
+  { regNo: "23BCE1163", student: "Divya S.", block: "Block A", room: "A-215" },
+  { regNo: "23BCE1298", student: "Nikhil V.", block: "Block C", room: "C-119" },
+];
+
+const EMPTY_ITEMS = { shirts: 0, trousers: 0, innerwear: 0, towels: 0, bedsheets: 0 };
+
+function ScannerViewfinder({ scanning, scanned }) {
+  return (
+    <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+      <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,.16)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.16)_1px,transparent_1px)] [background-size:26px_26px]" />
+
+      {["left-4 top-4 border-l-2 border-t-2", "right-4 top-4 border-r-2 border-t-2",
+        "left-4 bottom-4 border-b-2 border-l-2", "right-4 bottom-4 border-b-2 border-r-2"].map((pos) => (
+        <span key={pos} className={classNames("absolute h-8 w-8 rounded-sm border-indigo-400", pos)} />
+      ))}
+
+      {scanning && (
+        <div className="shlms-sweep absolute left-6 right-6 h-0.5 rounded-full bg-indigo-400 shadow-[0_0_16px_4px_rgba(99,102,241,.55)]" />
+      )}
+
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
+        {scanned ? (
+          <>
+            <CheckCircle2 size={38} className="text-emerald-400" />
+            <div>
+              <p className="text-sm font-semibold text-white">{scanned.student}</p>
+              <p className="font-mono text-xs text-indigo-300">{scanned.regNo}</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <QrCode size={40} className={classNames("text-indigo-300", scanning && "shlms-pulse")} />
+            <p className="text-xs text-slate-400">
+              {scanning ? "Reading student barcode…" : "Align the student ID barcode inside the frame"}
+            </p>
+          </>
+        )}
+      </div>
+
+      <div className="absolute bottom-3 left-0 right-0 text-center text-[10px] uppercase tracking-widest text-slate-500">
+        {scanning ? "scanning" : scanned ? "match found" : "camera idle"}
+      </div>
+    </div>
+  );
+}
+
+function StaffScan({ go }) {
+  const { submitLaundry } = useStore();
+  const [target, setTarget] = useState(SCANNABLE[0].regNo);
+  const [scanning, setScanning] = useState(false);
+  const [scanned, setScanned] = useState(null);
+  const [items, setItems] = useState(EMPTY_ITEMS);
+  const [remarks, setRemarks] = useState("");
+  const [error, setError] = useState("");
+  const timer = useRef(null);
+
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const startScan = () => {
+    setScanned(null);
+    setScanning(true);
+    setError("");
+    timer.current = setTimeout(() => {
+      setScanning(false);
+      setScanned(SCANNABLE.find((s) => s.regNo === target));
+      setItems(EMPTY_ITEMS);
+      setRemarks("");
+    }, 1600);
+  };
+
+  const total = countItems(items);
+  const weight = weighItems(items);
+
+  const submit = () => {
+    if (!total) { setError("Count at least one garment before submitting the bag."); return; }
+    setError("");
+    submitLaundry({ ...scanned, items, remarks, staff: STAFF.name });
+    setScanned(null);
+    setItems(EMPTY_ITEMS);
+    setRemarks("");
+  };
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-5">
+      <Card className="p-5 sm:p-6 lg:col-span-2">
+        <SectionHeader title="Scan student barcode" subtitle="Simulated reader — no camera hardware is used." />
+        <ScannerViewfinder scanning={scanning} scanned={scanned} />
+
+        <div className="mt-4 space-y-3">
+          <Field label="Barcode to simulate" hint="Stands in for the physical ID card at the counter.">
+            <Select
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              options={SCANNABLE.map((s) => ({ value: s.regNo, label: `${s.regNo} — ${s.student}` }))}
+              disabled={scanning}
+            />
+          </Field>
+          <Button className="w-full" onClick={startScan} disabled={scanning}>
+            {scanning
+              ? <><Loader2 size={15} className="animate-spin" /> Scanning…</>
+              : <><ScanLine size={15} /> Simulate scan</>}
+          </Button>
+          {scanned && (
+            <Button variant="secondary" className="w-full" onClick={() => setScanned(null)}>
+              <RefreshCw size={15} /> Reset reader
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      <Card className="p-5 sm:p-6 lg:col-span-3">
+        {!scanned ? (
+          <EmptyState
+            icon={QrCode}
+            title="Waiting for a scan"
+            hint="Once a student barcode is read, their details load here and the itemised submission form opens."
+          />
+        ) : (
+          <>
+            <SectionHeader
+              title="Log the laundry bag"
+              subtitle={`Auto-filled from the scan · counter operator ${STAFF.name}`}
+              action={<StatusPill status="Received" />}
+            />
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <DetailGrid
+                rows={[
+                  { label: "Student", value: scanned.student },
+                  { label: "Registration no.", value: scanned.regNo },
+                  { label: "Block", value: scanned.block },
+                  { label: "Room", value: scanned.room },
+                ]}
+              />
+            </div>
+
+            <div className="mt-5">
+              <p className="mb-2 text-xs font-medium text-slate-600">Itemised count</p>
+              <div className="space-y-2">
+                {GARMENTS.map((g) => (
+                  <div key={g.key} className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-2.5">
+                    <div>
+                      <p className="text-sm text-slate-800">{g.label}</p>
+                      <p className="text-[11px] text-slate-400">{g.weight} kg each</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary" size="sm"
+                        onClick={() => setItems((it) => ({ ...it, [g.key]: Math.max(0, it[g.key] - 1) }))}
+                      >
+                        −
+                      </Button>
+                      <span className="w-8 text-center text-sm font-semibold text-slate-900">{items[g.key]}</span>
+                      <Button
+                        variant="secondary" size="sm"
+                        onClick={() => setItems((it) => ({ ...it, [g.key]: it[g.key] + 1 }))}
+                      >
+                        +
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-indigo-50 px-4 py-3">
+              <span className="text-sm text-indigo-900">Bag totals</span>
+              <span className="text-sm font-semibold text-indigo-900">
+                {total} pieces · {weight} kg
+              </span>
+            </div>
+
+            <div className="mt-4">
+              <Field label="Special instructions (optional)" error={error}>
+                <Textarea rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="e.g. Whites to be washed separately, no bleach on the printed shirt." />
+              </Field>
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button onClick={submit}><CheckCircle2 size={15} /> Submit laundry bag</Button>
+              <Button variant="secondary" onClick={() => go("queue")}>Back to queue</Button>
+            </div>
+          </>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+/* --- Verify & Deliver ----------------------------------------------- */
+
+function OtpInput({ value, onChange, disabled }) {
+  const refs = useRef([]);
+
+  const setDigit = (i, digit) => {
+    const next = value.split("");
+    next[i] = digit;
+    onChange(next.join("").slice(0, 6));
+    if (digit && i < 5) refs.current[i + 1]?.focus();
+  };
+
+  return (
+    <div className="flex gap-2">
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <input
+          key={i}
+          ref={(el) => { refs.current[i] = el; }}
+          value={value[i] || ""}
+          disabled={disabled}
+          inputMode="numeric"
+          maxLength={1}
+          onChange={(e) => setDigit(i, e.target.value.replace(/\D/g, ""))}
+          onKeyDown={(e) => {
+            if (e.key === "Backspace" && !value[i] && i > 0) refs.current[i - 1]?.focus();
+          }}
+          onPaste={(e) => {
+            e.preventDefault();
+            const text = (e.clipboardData.getData("text") || "").replace(/\D/g, "").slice(0, 6);
+            if (text) { onChange(text); refs.current[Math.min(text.length, 5)]?.focus(); }
+          }}
+          className="h-12 w-11 rounded-lg border border-slate-200 text-center font-mono text-lg font-semibold text-slate-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-50"
+        />
+      ))}
+    </div>
+  );
+}
+
+function StaffDeliver() {
+  const { records, verifyOtp } = useStore();
+  const ready = records.filter((r) => r.status === "Ready for Pickup");
+  const [selected, setSelected] = useState("");
+  const [code, setCode] = useState("");
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    if (selected && !ready.some((r) => r.id === selected)) { setSelected(""); setCode(""); }
+  }, [ready, selected]);
+
+  const record = ready.find((r) => r.id === selected);
+
+  const verify = () => {
+    if (!selected) { setResult({ ok: false, reason: "Select the laundry record being handed over." }); return; }
+    if (code.length !== 6) { setResult({ ok: false, reason: "Enter all six digits of the pickup OTP." }); return; }
+    const outcome = verifyOtp(selected, code);
+    setResult(outcome);
+    if (outcome.ok) { setCode(""); setSelected(""); }
+  };
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-5">
+      <Card className="p-5 sm:p-6 lg:col-span-3">
+        <SectionHeader
+          title="Verify pickup OTP"
+          subtitle="The student reads out the six-digit code from their portal. Delivery is only recorded on a match."
+        />
+
+        <div className="space-y-5">
+          <Field label="Laundry record" hint="Only bags marked Ready for Pickup can be handed over.">
+            <Select
+              value={selected}
+              onChange={(e) => { setSelected(e.target.value); setResult(null); setCode(""); }}
+              options={[
+                { value: "", label: ready.length ? "Select a record…" : "No bags are ready for pickup" },
+                ...ready.map((r) => ({ value: r.id, label: `${r.id} — ${r.student} (${r.room})` })),
+              ]}
+            />
+          </Field>
+
+          {record && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <DetailGrid
+                rows={[
+                  { label: "Student", value: record.student },
+                  { label: "Reg. no.", value: record.regNo },
+                  { label: "Items", value: `${record.itemCount} pieces` },
+                  { label: "Ready since", value: record.timeline["Ready for Pickup"] || "—" },
+                ]}
+              />
+            </div>
+          )}
+
+          <div>
+            <p className="mb-2 text-xs font-medium text-slate-600">Pickup OTP</p>
+            <OtpInput value={code} onChange={(v) => { setCode(v); setResult(null); }} disabled={!selected} />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={verify}><ShieldCheck size={15} /> Verify & complete handover</Button>
+            <Button variant="secondary" onClick={() => { setCode(""); setResult(null); }}>Clear</Button>
+          </div>
+
+          {result && !result.ok && (
+            <div className="flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3">
+              <XCircle size={17} className="mt-0.5 shrink-0 text-rose-600" />
+              <p className="text-sm text-rose-800">{result.reason}</p>
+            </div>
+          )}
+
+          {result && result.ok && (
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-emerald-600" />
+                <div>
+                  <p className="text-sm font-medium text-emerald-900">
+                    {result.record.id} handed over to {result.record.student}.
+                  </p>
+                  <p className="text-xs text-emerald-700">Status moved to Delivered and the cycle is closed.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
+                <Mail size={17} className="mt-0.5 shrink-0 text-indigo-600" />
+                <div>
+                  <p className="text-sm font-medium text-slate-900">Pickup confirmation email sent</p>
+                  <p className="text-xs text-slate-500">
+                    Simulated delivery to {result.record.student} — the email notification service is not wired up in this prototype.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card className="p-5 sm:p-6 lg:col-span-2">
+        <SectionHeader title="Awaiting handover" subtitle={`${ready.length} bag${ready.length === 1 ? "" : "s"} ready at the counter`} />
+        {ready.length === 0 ? (
+          <EmptyState icon={Package} title="Nothing waiting" hint="Bags appear here once they reach Ready for Pickup." />
+        ) : (
+          <ul className="space-y-2">
+            {ready.map((r) => (
+              <li key={r.id}>
+                <button
+                  onClick={() => { setSelected(r.id); setResult(null); setCode(""); }}
+                  className={classNames(
+                    "flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors",
+                    selected === r.id ? "border-indigo-300 bg-indigo-50" : "border-slate-200 hover:bg-slate-50",
+                  )}
+                >
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">{r.student}</p>
+                    <p className="text-xs text-slate-400">{r.id} · {r.room} · {r.itemCount} items</p>
+                  </div>
+                  <ChevronRight size={15} className="text-slate-300" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-4 flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          <Hash size={13} className="mt-0.5 shrink-0" />
+          Demo tip: the student portal shows the live OTP for their own bag on the Overview and Track screens.
+        </p>
+      </Card>
+    </div>
+  );
+}
+
+/* --- Upload lost item ------------------------------------------------ */
+
+function StaffLostFound() {
+  const { lostItems, addLostItem } = useStore();
+  const [form, setForm] = useState({
+    description: "", category: LF_CATEGORIES[0], color: "", foundPlace: "", foundAt: dayOf(stamp()), photo: null,
+  });
+  const [errors, setErrors] = useState({});
+
+  const submit = () => {
+    const next = {};
+    if (form.description.trim().length < 6) next.description = "Describe the item in a few words.";
+    if (!form.color.trim()) next.color = "Colour helps students recognise it.";
+    if (!form.foundPlace.trim()) next.foundPlace = "Where was it found?";
+    setErrors(next);
+    if (Object.keys(next).length) return;
+    addLostItem({
+      description: form.description.trim(),
+      category: form.category,
+      color: form.color.trim(),
+      foundPlace: form.foundPlace.trim(),
+      foundAt: form.foundAt,
+      photo: form.photo?.dataUrl || null,
+      uploadedBy: STAFF.name,
+    });
+    setForm({ description: "", category: LF_CATEGORIES[0], color: "", foundPlace: "", foundAt: dayOf(stamp()), photo: null });
+    setErrors({});
+  };
+
+  const mine = lostItems.filter((i) => i.uploadedBy === STAFF.name);
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-5">
+      <Card className="p-5 sm:p-6 lg:col-span-3">
+        <SectionHeader
+          title="Upload an unclaimed item"
+          subtitle="Anything pulled out of the wash without a name tag goes on the student Lost & Found board."
+        />
+        <div className="space-y-4">
+          <Field label="Photo of the item">
+            <PhotoPicker value={form.photo} onChange={(p) => setForm({ ...form, photo: p })} hint="Drag a picture in, or click to browse. Stored in memory only." />
+          </Field>
+          <Field label="Description" error={errors.description}>
+            <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="e.g. Navy blue hooded sweatshirt, size L" />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Category">
+              <Select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} options={LF_CATEGORIES} />
+            </Field>
+            <Field label="Colour" error={errors.color}>
+              <Input value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} placeholder="e.g. Navy" />
+            </Field>
+            <Field label="Where it was found" error={errors.foundPlace}>
+              <Input value={form.foundPlace} onChange={(e) => setForm({ ...form, foundPlace: e.target.value })} placeholder="e.g. Dryer 2 drum" />
+            </Field>
+            <Field label="Date found">
+              <Input value={form.foundAt} onChange={(e) => setForm({ ...form, foundAt: e.target.value })} placeholder="e.g. 30 Aug" />
+            </Field>
+          </div>
+          <Button onClick={submit}><Upload size={15} /> Publish to Lost & Found</Button>
+        </div>
+      </Card>
+
+      <Card className="p-5 sm:p-6 lg:col-span-2">
+        <SectionHeader title="Items you uploaded" subtitle={`${mine.length} on the board`} />
+        {mine.length === 0 ? (
+          <EmptyState icon={Package} title="Nothing uploaded yet" />
+        ) : (
+          <ul className="space-y-2">
+            {mine.map((i) => (
+              <li key={i.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                  {i.photo ? <img src={i.photo} alt="" className="h-full w-full object-cover" /> : <Package size={16} className="text-slate-400" />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-900">{i.description}</p>
+                  <p className="text-xs text-slate-400">{i.id} · {i.foundAt}</p>
+                </div>
+                <StatusPill status={i.status} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 10. Administrator portal                                            */
+/* ------------------------------------------------------------------ */
+
+const ADMIN = { name: "Hostel Office", id: "ADM-01" };
+
+function AdminPortal({ onExit }) {
+  const [tab, setTab] = useState("analytics");
+  const { complaints, lostItems } = useStore();
+  const openComplaints = complaints.filter((c) => c.status !== "Resolved").length;
+  const pendingClaims = lostItems.filter((i) => i.status === "Claim Pending").length;
+
+  const navItems = [
+    { key: "analytics", label: "Analytics", icon: BarChart3 },
+    { key: "users", label: "Manage Users", icon: Users },
+    { key: "schedule", label: "Laundry Schedule", icon: Calendar },
+    { key: "complaints", label: "Complaints", icon: MessageSquare, badge: openComplaints || null },
+    { key: "lostfound", label: "Lost & Found", icon: Package, badge: pendingClaims || null },
+    { key: "reports", label: "Reports", icon: FileText },
+  ];
+
+  return (
+    <Shell
+      role="admin"
+      roleLabel="Administrator"
+      userName={ADMIN.name}
+      initials="AD"
+      navItems={navItems}
+      active={tab}
+      onNavigate={setTab}
+      onExit={onExit}
+    >
+      {tab === "analytics" && <AdminAnalytics />}
+      {tab === "users" && <AdminUsers />}
+      {tab === "schedule" && <AdminSchedule />}
+      {tab === "complaints" && <AdminComplaints />}
+      {tab === "lostfound" && <AdminLostFound />}
+      {tab === "reports" && <AdminReports />}
+    </Shell>
+  );
+}
+
+function ChartTooltip({ active, payload, label, unit = "items" }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-md">
+      <p className="text-xs font-medium text-slate-900">{label ?? payload[0].name}</p>
+      <p className="text-xs text-slate-500">
+        <span className="font-semibold text-indigo-600">{payload[0].value}</span> {unit}
+      </p>
+    </div>
+  );
+}
+
+function AdminAnalytics() {
+  const { records, complaints, feedback, users } = useStore();
+
+  const processedToday = records.filter((r) => r.status !== "Scheduled").reduce((t, r) => t + r.itemCount, 0);
+  const pending = records.filter((r) => !["Delivered", "Scheduled"].includes(r.status)).length;
+  const delivered = records.filter((r) => r.status === "Delivered").length;
+  const avgRating = feedback.length ? (feedback.reduce((t, f) => t + f.overall, 0) / feedback.length).toFixed(1) : "—";
+  const slaMet = records.length ? Math.round((delivered / records.length) * 100) : 0;
+
+  const complaintSplit = [
+    { name: "Resolved", value: complaints.filter((c) => c.status === "Resolved").length, color: "#4f46e5" },
+    { name: "Under Review", value: complaints.filter((c) => c.status === "Under Review").length, color: "#f59e0b" },
+    { name: "Open", value: complaints.filter((c) => c.status === "Open").length, color: "#e11d48" },
+  ].filter((s) => s.value > 0);
+
+  const blockVolume = BLOCK_VOLUME.map((b) => ({
+    ...b,
+    items: b.items + records.filter((r) => r.block === b.block).reduce((t, r) => t + r.itemCount, 0),
+  }));
+  const maxBlock = Math.max(...blockVolume.map((b) => b.items));
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Items processed" value={processedToday} sub="Across all active records" icon={Boxes} trend="12% vs last week" />
+        <StatCard label="Pending items" value={pending} sub="In wash, dry or awaiting pickup" icon={Timer} tint="amber" />
+        <StatCard label="Turnaround SLA" value={`${slaMet}%`} sub="Cycles closed within 48 h" icon={Percent} tint="emerald" />
+        <StatCard label="Average rating" value={`${avgRating} / 5`} sub={`${feedback.length} ratings collected`} icon={Star} tint="slate" />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-5">
+        <Card className="p-5 sm:p-6 lg:col-span-3">
+          <SectionHeader
+            title="Weekly laundry load"
+            subtitle="Pieces processed per day across all blocks (sample aggregation)."
+          />
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={WEEKLY_LOAD} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 12 }} />
+                <YAxis tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 12 }} />
+                <Tooltip cursor={{ fill: "rgba(79,70,229,0.06)" }} content={<ChartTooltip />} />
+                <Bar dataKey="items" fill="#4f46e5" radius={[6, 6, 0, 0]} maxBarSize={38} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-5 sm:p-6 lg:col-span-2">
+          <SectionHeader title="Complaints by status" subtitle="Live — updates as tickets are resolved." />
+          {complaintSplit.length === 0 ? (
+            <EmptyState icon={MessageSquare} title="No complaints on record" />
+          ) : (
+            <>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={complaintSplit} dataKey="value" nameKey="name" innerRadius={52} outerRadius={76} paddingAngle={3} stroke="none">
+                      {complaintSplit.map((s) => <Cell key={s.name} fill={s.color} />)}
+                    </Pie>
+                    <Tooltip content={<ChartTooltip unit="tickets" />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <ul className="mt-3 space-y-2">
+                {complaintSplit.map((s) => (
+                  <li key={s.name} className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2 text-slate-600">
+                      <span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />
+                      {s.name}
+                    </span>
+                    <span className="font-medium text-slate-900">{s.value}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-5">
+        <Card className="p-5 sm:p-6 lg:col-span-3">
+          <SectionHeader title="Block-wise laundry volume" subtitle="Season to date, including bags logged in this session." />
+          <ul className="space-y-4">
+            {blockVolume.map((b) => (
+              <li key={b.block}>
+                <div className="mb-1.5 flex items-center justify-between text-sm">
+                  <span className="text-slate-600">{b.block}</span>
+                  <span className="font-medium text-slate-900">{b.items} pieces</span>
+                </div>
+                <ProgressBar value={b.items} max={maxBlock} />
+              </li>
+            ))}
+          </ul>
+        </Card>
+
+        <Card className="p-5 sm:p-6 lg:col-span-2">
+          <SectionHeader title="Operations snapshot" />
+          <ul className="divide-y divide-slate-100 text-sm">
+            {[
+              { label: "Active accounts", value: users.filter((u) => u.status === "Active").length, icon: Users },
+              { label: "Suspended accounts", value: users.filter((u) => u.status === "Suspended").length, icon: Ban },
+              { label: "Bags in the pipeline", value: pending, icon: Activity },
+              { label: "Cycles closed", value: delivered, icon: CheckCircle2 },
+              { label: "Open complaints", value: complaints.filter((c) => c.status !== "Resolved").length, icon: AlertCircle },
+            ].map((row) => (
+              <li key={row.label} className="flex items-center justify-between py-3">
+                <span className="flex items-center gap-2.5 text-slate-600">
+                  <row.icon size={15} className="text-slate-400" /> {row.label}
+                </span>
+                <span className="font-semibold text-slate-900">{row.value}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function AdminUsers() {
+  const { users, addUser, toggleUser, removeUser } = useStore();
+  const [query, setQuery] = useState("");
+  const [role, setRole] = useState("all");
+  const [open, setOpen] = useState(false);
+  const blank = { name: "", role: "Student", identifier: "", block: BLOCKS[0], detail: "", email: "" };
+  const [form, setForm] = useState(blank);
+  const [errors, setErrors] = useState({});
+
+  const rows = users.filter((u) => {
+    const q = query.trim().toLowerCase();
+    const matchQ = !q || u.name.toLowerCase().includes(q) || u.identifier.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+    return matchQ && (role === "all" || u.role === role);
+  });
+
+  const submit = () => {
+    const next = {};
+    if (!form.name.trim()) next.name = "Name is required.";
+    if (!form.identifier.trim()) next.identifier = form.role === "Student" ? "Registration number is required." : "Staff ID is required.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) next.email = "Enter a valid email address.";
+    if (!form.detail.trim()) next.detail = form.role === "Student" ? "Room number is required." : "Shift is required.";
+    setErrors(next);
+    if (Object.keys(next).length) return;
+    addUser({ ...form, name: form.name.trim(), identifier: form.identifier.trim().toUpperCase(), email: form.email.trim() });
+    setForm(blank);
+    setErrors({});
+    setOpen(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Students" value={users.filter((u) => u.role === "Student").length} sub="Registered residents" icon={Users} />
+        <StatCard label="Laundry staff" value={users.filter((u) => u.role === "Staff").length} sub="Counter operators" icon={ClipboardList} tint="slate" />
+        <StatCard label="Suspended" value={users.filter((u) => u.status === "Suspended").length} sub="No portal access" icon={Ban} tint="rose" />
+      </div>
+
+      <Card className="p-5 sm:p-6">
+        <SectionHeader
+          title="User accounts"
+          subtitle="Students and laundry staff registered on the system."
+          action={
+            <div className="flex flex-wrap gap-2">
+              <SearchBar value={query} onChange={setQuery} placeholder="Search name, ID or email" className="w-full sm:w-60" />
+              <FilterDropdown value={role} onChange={setRole} options={["Student", "Staff"]} label="All roles" />
+              <Button onClick={() => setOpen(true)}><UserPlus size={15} /> Add user</Button>
+            </div>
+          }
+        />
+        <Table
+          columns={[
+            { key: "name", label: "Name" },
+            { key: "role", label: "Role" },
+            { key: "identifier", label: "Reg / Staff ID" },
+            { key: "block", label: "Block" },
+            { key: "detail", label: "Room / Shift" },
+            { key: "status", label: "Status" },
+            { key: "action", label: "", align: "right" },
+          ]}
+          rows={rows}
+          empty="No accounts match this filter."
+          render={(u, key) => {
+            if (key === "name") {
+              return (
+                <div>
+                  <p className="font-medium text-slate-900">{u.name}</p>
+                  <p className="text-xs text-slate-400">{u.email}</p>
+                </div>
+              );
+            }
+            if (key === "role") return <StatusPill status={u.role} />;
+            if (key === "status") return <StatusPill status={u.status} />;
+            if (key === "action") {
+              return (
+                <div className="flex justify-end gap-1.5">
+                  <Button size="sm" variant="secondary" onClick={() => toggleUser(u.id)}>
+                    {u.status === "Active" ? <><Ban size={13} /> Suspend</> : <><Check size={13} /> Activate</>}
+                  </Button>
+                  <Button size="sm" variant="danger" onClick={() => removeUser(u.id)}><Trash2 size={13} /></Button>
+                </div>
+              );
+            }
+            return u[key];
+          }}
+        />
+      </Card>
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Add a new user"
+        subtitle="Creates a local account record — no auth provider is connected."
+        width="max-w-xl"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={submit}><UserPlus size={15} /> Create account</Button>
+          </>
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Role">
+            <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} options={["Student", "Staff"]} />
+          </Field>
+          <Field label="Full name" error={errors.name}>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Ananya Iyer" />
+          </Field>
+          <Field label={form.role === "Student" ? "Registration number" : "Staff ID"} error={errors.identifier}>
+            <Input
+              value={form.identifier}
+              onChange={(e) => setForm({ ...form, identifier: e.target.value })}
+              placeholder={form.role === "Student" ? "23BCE1234" : "STF-120"}
+            />
+          </Field>
+          <Field label="Block">
+            <Select value={form.block} onChange={(e) => setForm({ ...form, block: e.target.value })} options={BLOCKS} />
+          </Field>
+          <Field label={form.role === "Student" ? "Room number" : "Shift"} error={errors.detail}>
+            <Input
+              value={form.detail}
+              onChange={(e) => setForm({ ...form, detail: e.target.value })}
+              placeholder={form.role === "Student" ? "C-118" : "Morning shift"}
+            />
+          </Field>
+          <Field label="Email" error={errors.email} className="sm:col-span-2">
+            <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="name@hostel.edu" />
+          </Field>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function AdminSchedule() {
+  const { schedule, blackouts, users, reassignBlock, addBlackout, removeBlackout } = useStore();
+  const [editing, setEditing] = useState(null);
+  const [day, setDay] = useState(WEEKDAYS[0]);
+  const [blackout, setBlackout] = useState({ date: "", reason: "" });
+  const [error, setError] = useState("");
+
+  const affected = (block) => users.filter((u) => u.role === "Student" && u.block === block).length;
+
+  const save = () => {
+    reassignBlock(editing, day);
+    setEditing(null);
+  };
+
+  const submitBlackout = () => {
+    if (!blackout.date.trim() || !blackout.reason.trim()) { setError("Both a date and a reason are needed."); return; }
+    addBlackout(blackout.date.trim(), blackout.reason.trim());
+    setBlackout({ date: "", reason: "" });
+    setError("");
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card className="p-5 sm:p-6">
+        <SectionHeader
+          title="Block laundry days"
+          subtitle="One collection day per block. Reassigning notifies students and staff immediately."
+        />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {BLOCKS.map((block) => (
+            <Card key={block} className="p-5">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                    <Building2 size={17} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{block}</p>
+                    <p className="text-xs text-slate-400">{affected(block)} students</p>
+                  </div>
+                </div>
+                <span className="rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">
+                  {schedule[block]}
+                </span>
+              </div>
+              <div className="mt-4 flex gap-1.5">
+                {WEEKDAYS.map((d) => (
+                  <span
+                    key={d}
+                    className={classNames(
+                      "flex-1 rounded-md py-1 text-center text-[11px] font-medium",
+                      schedule[block] === d ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-400",
+                    )}
+                  >
+                    {d[0]}
+                  </span>
+                ))}
+              </div>
+              <Button
+                variant="secondary" size="sm" className="mt-4 w-full"
+                onClick={() => { setEditing(block); setDay(schedule[block]); }}
+              >
+                <RefreshCw size={13} /> Reassign day
+              </Button>
+            </Card>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="p-5 sm:p-6">
+        <SectionHeader
+          title="Holiday & maintenance blackouts"
+          subtitle="Days with no wash cycles. Students see the next available slot instead."
+        />
+        <div className="grid gap-6 lg:grid-cols-5">
+          <div className="lg:col-span-3">
+            {blackouts.length === 0 ? (
+              <EmptyState icon={CalendarDays} title="No blackout dates" hint="Add one when a machine is down or the hostel is closed." />
+            ) : (
+              <ul className="space-y-2">
+                {blackouts.map((b) => (
+                  <li key={b.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
+                        <CalendarDays size={16} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">{b.date}</p>
+                        <p className="text-xs text-slate-500">{b.reason}</p>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => removeBlackout(b.id)}><Trash2 size={13} /></Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="space-y-3 lg:col-span-2">
+            <Field label="Date">
+              <Input value={blackout.date} onChange={(e) => setBlackout({ ...blackout, date: e.target.value })} placeholder="e.g. 12 Sep" />
+            </Field>
+            <Field label="Reason" error={error}>
+              <Input value={blackout.reason} onChange={(e) => setBlackout({ ...blackout, reason: e.target.value })} placeholder="e.g. Washer servicing" />
+            </Field>
+            <Button className="w-full" onClick={submitBlackout}><Plus size={15} /> Add blackout date</Button>
+          </div>
+        </div>
+      </Card>
+
+      <Modal
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        title={editing ? `Reassign ${editing}` : ""}
+        subtitle={editing ? `${affected(editing)} students will be notified of the change.` : ""}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setEditing(null)}>Cancel</Button>
+            <Button onClick={save}><Check size={15} /> Save schedule</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Field label="New laundry day">
+            <Select value={day} onChange={(e) => setDay(e.target.value)} options={WEEKDAYS} />
+          </Field>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            Blocks already on <span className="font-medium text-slate-900">{day}</span>:{" "}
+            {BLOCKS.filter((b) => schedule[b] === day && b !== editing).join(", ") || "none"}.
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function AdminComplaints() {
+  const { complaints, resolveComplaint, updateComplaintStatus } = useStore();
+  const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const [review, setReview] = useState(null);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+
+  const rows = complaints
+    .filter((c) => filter === "all" || c.status === filter)
+    .filter((c) => {
+      const q = query.trim().toLowerCase();
+      return !q || c.id.toLowerCase().includes(q) || c.student.toLowerCase().includes(q) || c.subject.toLowerCase().includes(q);
+    });
+
+  const openReview = (c) => { setReview(c); setNote(c.resolution || ""); setError(""); };
+
+  const resolve = () => {
+    if (note.trim().length < 8) { setError("Add a short resolution note for the student."); return; }
+    resolveComplaint(review.id, note.trim());
+    setReview(null);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        {["Open", "Under Review", "Resolved"].map((s, i) => (
+          <StatCard
+            key={s} label={s} value={complaints.filter((c) => c.status === s).length}
+            sub={s === "Resolved" ? "Closed tickets" : "Needs the office"}
+            icon={[AlertCircle, Timer, CheckCircle2][i]} tint={["rose", "amber", "emerald"][i]}
+          />
+        ))}
+      </div>
+
+      <Card className="p-5 sm:p-6">
+        <SectionHeader
+          title="Complaint queue"
+          subtitle="Every ticket raised across all blocks, newest first."
+          action={
+            <div className="flex flex-wrap gap-2">
+              <SearchBar value={query} onChange={setQuery} placeholder="Search ticket, student or subject" className="w-full sm:w-64" />
+              <FilterDropdown value={filter} onChange={setFilter} options={["Open", "Under Review", "Resolved"]} label="All statuses" />
+            </div>
+          }
+        />
+        <Table
+          columns={[
+            { key: "id", label: "Ticket" },
+            { key: "student", label: "Student" },
+            { key: "recordId", label: "Record" },
+            { key: "category", label: "Category" },
+            { key: "createdAt", label: "Raised" },
+            { key: "status", label: "Status" },
+            { key: "action", label: "", align: "right" },
+          ]}
+          rows={rows}
+          empty="No complaints match this filter."
+          render={(c, key) => {
+            if (key === "id") {
+              return (
+                <div>
+                  <p className="font-medium text-slate-900">{c.id}</p>
+                  <p className="max-w-[180px] truncate text-xs text-slate-400">{c.subject}</p>
+                </div>
+              );
+            }
+            if (key === "student") {
+              return (
+                <div>
+                  <p className="text-slate-900">{c.student}</p>
+                  <p className="text-xs text-slate-400">{c.regNo}</p>
+                </div>
+              );
+            }
+            if (key === "status") return <StatusPill status={c.status} />;
+            if (key === "action") {
+              return (
+                <div className="flex justify-end gap-1.5">
+                  {c.status === "Open" && (
+                    <Button size="sm" variant="secondary" onClick={() => updateComplaintStatus(c.id, "Under Review")}>
+                      <Search size={13} /> Start review
+                    </Button>
+                  )}
+                  <Button size="sm" variant={c.status === "Resolved" ? "ghost" : "primary"} onClick={() => openReview(c)}>
+                    {c.status === "Resolved" ? "View" : "Review & resolve"}
+                  </Button>
+                </div>
+              );
+            }
+            return c[key];
+          }}
+        />
+      </Card>
+
+      <Modal
+        open={!!review}
+        onClose={() => setReview(null)}
+        title={review ? `${review.id} · ${review.category}` : ""}
+        subtitle={review ? `Raised by ${review.student} (${review.regNo}) on ${review.createdAt}` : ""}
+        width="max-w-2xl"
+        footer={
+          review?.status === "Resolved" ? (
+            <Button variant="secondary" onClick={() => setReview(null)}>Close</Button>
+          ) : (
+            <>
+              <Button variant="secondary" onClick={() => setReview(null)}>Cancel</Button>
+              <Button variant="success" onClick={resolve}><CheckCircle2 size={15} /> Mark resolved</Button>
+            </>
+          )
+        }
+      >
+        {review && (
+          <div className="space-y-5">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <DetailGrid
+                rows={[
+                  { label: "Laundry record", value: review.recordId },
+                  { label: "Handled by", value: review.handler },
+                  { label: "Category", value: review.category },
+                  { label: "Status", value: <StatusPill status={review.status} /> },
+                ]}
+              />
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-slate-600">Student description</p>
+              <p className="mt-1.5 rounded-lg border border-slate-200 px-4 py-3 text-sm leading-relaxed text-slate-700">
+                {review.description}
+              </p>
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-slate-600">Photo evidence</p>
+              {review.photo ? (
+                <img src={review.photo} alt="Complaint evidence" className="max-h-64 rounded-lg border border-slate-200 object-contain" />
+              ) : (
+                <p className="rounded-lg border border-dashed border-slate-200 px-4 py-6 text-center text-xs text-slate-400">
+                  No photo was attached to this ticket.
+                </p>
+              )}
+            </div>
+
+            <Field label="Resolution note" error={error} hint="Sent to the student when the ticket is closed.">
+              <Textarea
+                rows={3}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                disabled={review.status === "Resolved"}
+                placeholder="e.g. Item traced to the Block A sorting tray and returned on 31 Aug."
+              />
+            </Field>
+
+            {review.status === "Resolved" && review.resolvedAt && (
+              <p className="text-xs text-emerald-600">Resolved on {review.resolvedAt}.</p>
+            )}
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+
+function AdminLostFound() {
+  const { lostItems, settleClaim } = useStore();
+  const [filter, setFilter] = useState("all");
+  const pending = lostItems.filter((i) => i.status === "Claim Pending");
+  const rows = lostItems.filter((i) => filter === "all" || i.status === filter);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="On the board" value={lostItems.filter((i) => i.status === "Available").length} sub="Unclaimed items" icon={Package} />
+        <StatCard label="Claims to verify" value={pending.length} sub="Waiting on the office" icon={ShieldCheck} tint="amber" />
+        <StatCard label="Released" value={lostItems.filter((i) => i.status === "Returned").length} sub="Returned to owners" icon={CheckCircle2} tint="emerald" />
+      </div>
+
+      <Card className="p-5 sm:p-6">
+        <SectionHeader title="Claims awaiting verification" subtitle="Match the student's proof against the item before releasing it." />
+        {pending.length === 0 ? (
+          <EmptyState icon={ShieldCheck} title="No claims to verify" hint="Student claims land here the moment they are submitted." />
+        ) : (
+          <div className="space-y-3">
+            {pending.map((item) => (
+              <div key={item.id} className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white">
+                      {item.photo ? <img src={item.photo} alt="" className="h-full w-full object-cover" /> : <Package size={18} className="text-slate-400" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{item.id} · {item.description}</p>
+                      <p className="text-xs text-slate-500">
+                        {item.category} · {item.color} · found at {item.foundPlace} on {item.foundAt}
+                      </p>
+                    </div>
+                  </div>
+                  <StatusPill status={item.status} />
+                </div>
+
+                <div className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-xs text-slate-500">
+                    Claimed by <span className="font-medium text-slate-900">{item.claim?.by}</span> ({item.claim?.regNo}) · {item.claim?.at}
+                  </p>
+                  <p className="mt-1.5 text-sm text-slate-700">{item.claim?.proof}</p>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" variant="success" onClick={() => settleClaim(item.id, true)}>
+                    <CheckCircle2 size={13} /> Approve release
+                  </Button>
+                  <Button size="sm" variant="danger" onClick={() => settleClaim(item.id, false)}>
+                    <XCircle size={13} /> Reject claim
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card className="p-5 sm:p-6">
+        <SectionHeader
+          title="All lost & found items"
+          action={<FilterDropdown value={filter} onChange={setFilter} options={["Available", "Claim Pending", "Returned"]} label="All statuses" />}
+        />
+        <Table
+          columns={[
+            { key: "id", label: "Item" },
+            { key: "category", label: "Category" },
+            { key: "foundPlace", label: "Found at" },
+            { key: "uploadedBy", label: "Uploaded by" },
+            { key: "claim", label: "Claimant" },
+            { key: "status", label: "Status" },
+          ]}
+          rows={rows}
+          empty="No items match this filter."
+          render={(i, key) => {
+            if (key === "id") {
+              return (
+                <div>
+                  <p className="font-medium text-slate-900">{i.id}</p>
+                  <p className="max-w-[200px] truncate text-xs text-slate-400">{i.description}</p>
+                </div>
+              );
+            }
+            if (key === "foundPlace") return `${i.foundPlace} · ${i.foundAt}`;
+            if (key === "claim") return i.claim ? `${i.claim.by} (${i.claim.regNo})` : "—";
+            if (key === "status") return <StatusPill status={i.status} />;
+            return i[key];
+          }}
+        />
+      </Card>
+    </div>
+  );
+}
+
+/* --- Reports --------------------------------------------------------- */
+
+const REPORTS = [
+  {
+    key: "daily", title: "Daily operations summary", icon: ClipboardList,
+    desc: "Every laundry record with its current stage, handler and item count.",
+  },
+  {
+    key: "complaints", title: "Weekly complaints & SLA audit", icon: MessageSquare,
+    desc: "Tickets raised, category split, resolution notes and time to close.",
+  },
+  {
+    key: "feedback", title: "Monthly feedback & service rating", icon: Star,
+    desc: "Star ratings by dimension with the comments students left.",
+  },
+  {
+    key: "blocks", title: "Block-wise load distribution", icon: Building2,
+    desc: "Pieces processed per block against the assigned collection day.",
+  },
+];
+
+function AdminReports() {
+  const { records, complaints, feedback, schedule, toast } = useStore();
+  const [busy, setBusy] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [log, setLog] = useState([]);
+  const timers = useRef([]);
+
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
+  const buildRows = (key) => {
+    if (key === "daily") {
+      return [
+        ["Record", "Student", "Reg no", "Block", "Room", "Items", "Weight (kg)", "Stage", "Handler", "Submitted"],
+        ...records.map((r) => [r.id, r.student, r.regNo, r.block, r.room, r.itemCount, r.weightKg, r.status, r.staff, r.submittedAt]),
+      ];
+    }
+    if (key === "complaints") {
+      return [
+        ["Ticket", "Student", "Record", "Category", "Status", "Raised", "Resolution"],
+        ...complaints.map((c) => [c.id, c.student, c.recordId, c.category, c.status, c.createdAt, c.resolution || "—"]),
+      ];
+    }
+    if (key === "feedback") {
+      return [
+        ["Rating id", "Record", "Student", "Overall", "Cleanliness", "Speed", "Care", "Comment", "Submitted"],
+        ...feedback.map((f) => [f.id, f.recordId, f.student, f.overall, f.cleanliness, f.speed, f.care, f.note || "—", f.at]),
+      ];
+    }
+    return [
+      ["Block", "Collection day", "Records", "Pieces"],
+      ...BLOCKS.map((b) => {
+        const rs = records.filter((r) => r.block === b);
+        return [b, schedule[b], rs.length, rs.reduce((t, r) => t + r.itemCount, 0)];
+      }),
+    ];
+  };
+
+  const run = (report, format) => {
+    if (busy) return;
+    setBusy(`${report.key}:${format}`);
+    setProgress(8);
+    timers.current.forEach(clearTimeout);
+    timers.current = [30, 55, 78, 94].map((p, i) => setTimeout(() => setProgress(p), 220 * (i + 1)));
+
+    timers.current.push(setTimeout(() => {
+      const rows = buildRows(report.key);
+      const date = dayOf(stamp());
+      const base = `SHLMS_${report.key}_${date.replace(/\s/g, "")}`;
+      const ok = format === "excel"
+        ? downloadBlob(`${base}.csv`, "text/csv;charset=utf-8", buildCsv(rows))
+        : downloadBlob(`${base}.pdf`, "application/pdf", buildPdf(
+          report.title,
+          [`Generated ${stamp()} · SHLMS frontend prototype`, ""].concat(
+            rows.map((r) => r.map((c) => String(c)).join("  |  ")),
+          ),
+        ));
+
+      setProgress(100);
+      setLog((l) => [{
+        id: uid("EXP"),
+        text: `${report.title} — ${format === "excel" ? "Excel (CSV)" : "PDF"} · ${rows.length - 1} rows`,
+        at: stamp(),
+        ok,
+      }, ...l].slice(0, 6));
+      toast(ok ? `${report.title} downloaded` : "Report built, but the browser blocked the download", ok ? "success" : "danger");
+
+      timers.current.push(setTimeout(() => { setBusy(null); setProgress(0); }, 500));
+    }, 1150));
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card className="p-5 sm:p-6">
+        <SectionHeader
+          title="Generate a report"
+          subtitle="Reports are built from the live session state and downloaded straight from the browser."
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          {REPORTS.map((r) => {
+            const running = busy && busy.startsWith(`${r.key}:`);
+            return (
+              <Card key={r.key} className="flex flex-col p-5">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                    <r.icon size={17} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{r.title}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{r.desc}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => run(r, "pdf")}>
+                    {running && busy.endsWith("pdf")
+                      ? <><Loader2 size={13} className="animate-spin" /> Building…</>
+                      : <><FileText size={13} /> PDF</>}
+                  </Button>
+                  <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => run(r, "excel")}>
+                    {running && busy.endsWith("excel")
+                      ? <><Loader2 size={13} className="animate-spin" /> Building…</>
+                      : <><FileSpreadsheet size={13} /> Excel</>}
+                  </Button>
+                  <span className="ml-auto self-center text-[11px] text-slate-400">
+                    {buildRows(r.key).length - 1} rows
+                  </span>
+                </div>
+
+                {running && <ProgressBar className="mt-3" value={progress} />}
+              </Card>
+            );
+          })}
+        </div>
+      </Card>
+
+      <Card className="p-5 sm:p-6">
+        <SectionHeader title="Export history" subtitle="This session only — nothing is stored server-side." />
+        {log.length === 0 ? (
+          <EmptyState icon={Download} title="No exports yet" hint="Generated files appear here after you download them." />
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {log.map((l) => (
+              <li key={l.id} className="flex items-center justify-between py-3">
+                <div className="flex items-center gap-3">
+                  <div className={classNames(
+                    "flex h-8 w-8 items-center justify-center rounded-lg",
+                    l.ok ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600",
+                  )}>
+                    {l.ok ? <Download size={15} /> : <XCircle size={15} />}
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-800">{l.text}</p>
+                    <p className="text-xs text-slate-400">{l.at}</p>
+                  </div>
+                </div>
+                <StatusPill status={l.ok ? "Delivered" : "Open"} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 11. Root — portal switch + shared store                             */
+/* ------------------------------------------------------------------ */
+
+function AppRoot() {
+  const [portal, setPortal] = useState("landing");
+  const back = () => setPortal("landing");
+
+  return (
+    <>
+      <GlobalStyles />
+      {portal === "landing" && <Landing onPick={setPortal} />}
+      {portal === "student" && <StudentPortal onExit={back} />}
+      {portal === "staff" && <StaffPortal onExit={back} />}
+      {portal === "admin" && <AdminPortal onExit={back} />}
+      <ToastHost />
+    </>
+  );
+}
+
+function SHLMSApp() {
+  return (
+    <StoreProvider>
+      <AppRoot />
+    </StoreProvider>
+  );
+}
+
+
+/* ---- mount ---- */
+ReactDOM.createRoot(document.getElementById("root")).render(<SHLMSApp />);
+</script>
+</body>
+</html>

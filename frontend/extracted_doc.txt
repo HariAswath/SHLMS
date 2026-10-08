@@ -1,0 +1,179 @@
+﻿
+Frontend Design Document
+for
+Smart Hostel Laundry Management System (SHLMS)
+Name: Hirthick Srinivaasan V B
+Reg. No: 24BRS1281   Slot: D2 + TD2
+Date: August 2026
+
+1. Aim
+To design and build a frontend-only interface for the Smart Hostel Laundry Management System (SHLMS), implemented with React components, that reflects the system&apos;s three portals (Student, Laundry Staff, Administrator) already defined in the project&apos;s SRS, use-case diagram, ER diagram, and sequence diagrams, using Stripe&apos;s dashboard design language as the visual direction.
+2. Introduction
+This document covers the frontend-only prototype built for SHLMS as part of the current project deliverable. No backend, database, or API is implemented at this stage — every screen runs on in-memory mock data, and actions such as scanning a QR code or verifying an OTP are simulated in the browser. The purpose of the prototype is to validate the screens, navigation, and component structure the real application will need, and to give the project a concrete visual identity before backend work begins.
+The interface is built as React function components, styled with Tailwind CSS utility classes, using lucide-react for icons and Recharts for the admin analytics charts. The three portals map directly onto the actors already identified in the project&apos;s use-case diagram (Student, Laundry Staff, Administrator, plus the User and Email Notification Service actors), and each screen maps onto specific requirements from the project SRS (Section 6 of this document lists that mapping).
+3. Objectives
+Translate the SRS&apos;s fifteen features into concrete, navigable screens for each of the three portals.
+Reuse a small set of components (cards, tables, status pills, buttons) consistently across all screens, rather than styling each screen individually.
+Adopt Stripe&apos;s dashboard visual language — sidebar navigation, card-based layout, restrained color, and clear data tables — as the project&apos;s design direction.
+Represent the laundry status pipeline (Scheduled → Received → Washing → Drying → Ready for Pickup → Delivered) visually, in a way a first-time user can read at a glance.
+Keep the prototype frontend-only and framework-light, so it can later be connected to a real backend without a redesign.
+4. Design Direction
+The visual direction for this project is Stripe&apos;s dashboard design language: a light, uncluttered interface built around white cards, a single indigo accent colour, restrained shadows, and clear data tables — the same visual grammar Stripe uses for its own merchant dashboard. The tables below record the specific colour, type, and layout decisions used throughout the prototype, so the same values can be reapplied consistently if the interface is extended.
+4.1 Colour Palette
+Hex
+Swatch
+Role
+Used for
+#4F46E5
+Indigo 600 (primary)
+Primary buttons, active nav item, links, chart accent
+#0F172A
+Slate 900 (text)
+Headings and primary text
+#64748B
+Slate 500 (secondary text)
+Captions, labels, helper text
+#F8FAFC
+Slate 50 (background)
+Page background behind cards
+#E2E8F0
+Slate 200 (border)
+Card borders, table dividers
+#10B981
+Emerald 500 (success)
+Delivered / resolved / active status
+#F59E0B
+Amber 500 (warning)
+Drying / under-review status
+#E11D48
+Rose 600 (danger)
+Open complaints, delayed items, errors
+These map onto Tailwind&apos;s built-in indigo / slate / emerald / amber / rose colour scales rather than custom hex values, so every shade used in the interface comes from the same restrained palette instead of one-off colours per screen.
+4.2 Typography
+Stripe&apos;s own dashboard uses a single geometric sans-serif family (Söhne) across every weight, rather than pairing a display face with a separate body face. This prototype follows that same approach with Inter, the closest widely available equivalent: semibold (600) for headings and stat numbers, medium (500) for labels and buttons, and regular (400) for body and table text. Using one family throughout — rather than mixing a display and body font — is itself the deliberate choice here, matching Stripe&apos;s own restrained system.
+4.3 Layout
+Fixed left sidebar (240px) for portal navigation, consistent across Student, Staff, and Admin portals.
+Top bar showing the current section title, role label, notification icon, and a user avatar.
+Main content area laid out as a card grid — statistic cards in a row, followed by a primary content card (table, chart, or form).
+12px corner radius on cards, 8px on buttons and inputs, a single 1px border colour throughout — no drop shadows beyond a subtle ambient one on cards.
+4.4 Signature Element — the Laundry Stepper
+The one element this interface is built around is a horizontal status stepper, styled directly on Stripe&apos;s own payment-lifecycle indicator (the row of circles Stripe uses to show a payment moving from Created through to Succeeded). Here it is repurposed to track a laundry item instead of a payment: Scheduled → Received → Washing → Drying → Ready for Pickup → Delivered, with filled indigo circles for completed steps, a hollow indigo circle for the current step, and grey for steps still ahead. It appears on both the Student&apos;s tracking screen and the Student overview, since checking laundry status is the single most common reason a student opens the app.
+5. Screens by Portal
+Every screen below corresponds to a React component in the prototype file. Navigation between screens is handled with local component state (no router), since the prototype is frontend-only.
+5.1 Landing / Role Selection
+A single entry screen with three cards — Student, Laundry Staff, Administrator — standing in for the login step. In the real system this would follow authentication (SRS REQ-AUTH-01–04); here it simply lets a reviewer jump straight to any portal.
+5.2 Student Portal
+Overview — next laundry day, current status with the stepper, open complaint count, quick actions, and recent notifications.
+Track Laundry — full-size stepper for the active record, plus a table of all records with status.
+History — a table of every past laundry cycle and its outcome.
+Complaints — list of complaints raised, with a form to raise a new one against a specific record.
+Lost &amp; Found — a card grid of unclaimed items uploaded by staff, each with a Claim action.
+Feedback — a star rating and comment form for the most recently delivered record.
+5.3 Laundry Staff Portal
+Today&apos;s Queue — stat cards (assigned, scan-pending, ready for pickup, open complaints) and a table of today&apos;s assigned students.
+Scan &amp; Submit — a simulated QR scan panel on the left, and a submission form (clothes count, weight, remarks) that appears once a student is &quot;found&quot; on the right.
+Verify &amp; Deliver — an OTP entry field that confirms delivery once a 6-digit code is entered.
+Upload Lost Item — a simple photo/description form for items left behind.
+5.4 Administrator Portal
+Analytics — stat cards plus a weekly laundry-load bar chart and a complaint-status donut chart.
+Manage Users — a table of student and staff accounts.
+Schedule — one card per hostel block showing its assigned laundry day, with a Reassign action.
+Complaints — the full complaint table with a Resolve action for open items.
+Lost &amp; Found — pending claims awaiting admin verification before release.
+Reports — a list of exportable reports with PDF and Excel download actions.
+6. Component Architecture
+The prototype is built from a small set of shared components, reused across all three portals rather than styled per screen:
+Component
+Purpose
+Shell
+Sidebar + top bar layout wrapper shared by all three portals
+Card
+White, bordered, rounded container used for every content block
+Button
+Primary / secondary / ghost / danger button variants
+StatCard
+Icon + label + value tile used for dashboard summary numbers
+StatusPill
+Colour-coded label for laundry, complaint, and account status
+LaundryStepper
+The signature status-pipeline component described in Section 4.4
+Table
+Shared data-table renderer used across history, queues, and admin lists
+SectionHeader
+Title + subtitle + optional action button, used above every content card
+7. Technology Stack
+Layer
+Choice
+UI library
+React (function components + hooks)
+Styling
+Tailwind CSS utility classes
+Icons
+lucide-react
+Charts
+Recharts (bar chart, donut chart)
+State
+Local component state only — no router, no global store, no backend calls
+Data
+In-memory mock data standing in for the ER model in Appendix B of the project SRS
+This is deliberately the same frontend stack already listed in the project&apos;s SRS (Section 2.5 — Next.js, TypeScript, Tailwind CSS, shadcn/ui), minus the backend-dependent pieces (NextAuth, Supabase, OTP/email libraries) that don&apos;t apply to a frontend-only prototype.
+8. Mapping to SRS Features and Use Cases
+Each screen implements the frontend half of specific requirements already defined in the project SRS and use-case diagram:
+Screen
+SRS Feature / Requirement
+Use Case(s)
+Landing
+REQ-AUTH-01 – 04
+Log In
+Student Overview / Track
+REQ-TRK-01 – 03
+Track Laundry Status
+Student History
+REQ-HIS-01 – 02
+View Laundry History
+Student Complaints
+REQ-CMP-01 – 04
+Raise Complaint, Attach Photo Evidence
+Student Lost &amp; Found
+REQ-LF-02
+Browse and Claim Lost Item
+Student Feedback
+REQ-FBK-01 – 02
+Submit Feedback
+Staff Queue
+REQ-SCH-03, REQ-STD-01 – 02
+View Assigned Schedule
+Staff Scan &amp; Submit
+REQ-QR-01 – 03, REQ-SUB-01 – 04
+Record Laundry Submission, Scan Student Barcode
+Staff Verify &amp; Deliver
+REQ-OTP-01 – 03
+Complete Laundry Handover, Verify Pickup OTP
+Staff Lost &amp; Found Upload
+REQ-LF-01
+Upload Lost Item
+Admin Analytics
+REQ-ADA-01 – 02
+View Analytics Dashboard, Monitor Laundry Operations
+Admin Users
+REQ-AUTH-04
+Manage User Accounts
+Admin Schedule
+REQ-SCH-01 – 02
+Manage Laundry Schedule
+Admin Complaints
+REQ-CMP-03 – 04
+Resolve Complaint
+Admin Lost &amp; Found
+REQ-LF-03 – 04
+Verify Lost Item Claim
+Admin Reports
+REQ-RPT-01 – 02
+Generate Report, Export Report (PDF / Excel)
+9. Known Limitations (Frontend-Only Scope)
+No backend, database, or authentication — all data is hard-coded mock data, and actions like &quot;Simulate scan&quot; or OTP verification only change local component state.
+No routing library is used; switching portals or screens resets any unsaved form state, since there is no persistence layer yet.
+Charts and statistics on the Admin Analytics screen use fixed sample numbers, not live aggregation.
+Responsive behaviour below tablet width has not been tuned; the layout targets desktop/laptop screens, matching how the Staff and Admin portals are expected to be used in practice.
+10. Conclusion
+This prototype gives the SHLMS project a working, navigable frontend across all three portals defined in the project&apos;s SRS and use-case diagram, built from a small reusable component set and a single consistent design direction drawn from Stripe&apos;s dashboard interface. It is intentionally frontend-only: every screen is wired to mock data rather than a live backend, so the next stage of the project is connecting these same components to the API and database already specified in the SRS and ER diagram, without needing to redesign the interface itself.

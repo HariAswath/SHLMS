@@ -79,6 +79,42 @@ export const submitFeedback = async (req, res, next) => {
   }
 };
 
+
+// ==========================================
+// 1b. Get My Feedback (Student Only)
+// ==========================================
+export const getMyFeedback = async (req, res, next) => {
+  try {
+    const studentId = req.user.id;
+
+    const records = await db.query.feedback.findMany({
+      where: eq(feedback.studentId, studentId),
+      orderBy: [desc(feedback.createdAt)],
+      with: {
+        laundry: {
+          columns: {
+            id: true,
+            status: true,
+            clothDetails: true,
+            submittedAt: true,
+            deliveredAt: true,
+          },
+        },
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Your feedback records retrieved successfully",
+      data: {
+        total: records.length,
+        feedbacks: records,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 // ==========================================
 // 2. View All Feedback (Admin Only)
 // ==========================================
